@@ -1,0 +1,13 @@
+{
+  "name": "don-trading-web",
+  "version": "1.0.0",
+  "description": "Mi sitio en Firebase",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'No build needed'",
+    "start": "servor"
+  },
+  "dependencies": {
+    "servor": "^4.0.2"
+  }
+}
