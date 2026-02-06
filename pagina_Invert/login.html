@@ -646,15 +646,17 @@
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <script>
         // ═════════════════════════════════════════════════════════════════════════════
-        // DONTRADING — AUTH MODULE v1.3
-        // ✅ FIX: Firebase Config actualizado a proyecto "dontrading-pro"
-        // ✅ SDK: Compat (firebase.auth(), firebase.firestore())
-        // ✅ Providers: Phone Auth + Email/Password
-        // ═════════════════════════════════════════════════════════════════════════════
+// DONTRADING — AUTH MODULE v1.4
+// ✅ FIX v1.4: Redirect garantizado después de OTP verificado
+// ✅ FIX: Firestore write envuelto en try/catch independiente
+// ✅ FIX: onAuthStateChanged auto-redirect habilitado
+// ✅ SDK: Compat (firebase.auth(), firebase.firestore())
+// ✅ Providers: Phone Auth + Email/Password
+// ═════════════════════════════════════════════════════════════════════════════
 
-        // ─────────────────────────────────────────────────────────────────────────────
-        // FIREBASE CONFIG — PROYECTO: dontrading-pro (Plan Blaze)
-        // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// FIREBASE CONFIG — PROYECTO: dontrading-pro (Plan Blaze)
+// ─────────────────────────────────────────────────────────────────────────────
         var firebaseConfig = {
             apiKey: "AIzaSyAdKShZMYYdmZ3bkmaDWsEhsLsT0YIgz-8",
             authDomain: "dontrading-pro.firebaseapp.com",
@@ -729,6 +731,18 @@
 
         function hideAlert() {
             document.getElementById('alertBox').className = 'alert';
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // REDIRECT HELPER — Función centralizada para redirigir al dashboard
+        // ═════════════════════════════════════════════════════════════════════════════
+        function redirectToDashboard(delay) {
+            delay = delay || 1200;
+            console.log('🚀 Redirect programado a dashboard.html en ' + delay + 'ms');
+            setTimeout(function() {
+                console.log('🚀 Ejecutando redirect a dashboard.html AHORA');
+                window.location.href = 'dashboard.html';
+            }, delay);
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
@@ -893,8 +907,9 @@
                 if (userData.email) {
                     try {
                         await auth.signInWithEmailAndPassword(userData.email, password);
+                        console.log('✅ Login exitoso con email+password');
                         showAlert('success', '¡Bienvenido de vuelta! Redirigiendo...');
-                        setTimeout(function() { window.location.href = 'dashboard.html'; }, 1200);
+                        redirectToDashboard(1200);
                     } catch (emailErr) {
                         if (emailErr.code === 'auth/wrong-password' || emailErr.code === 'auth/invalid-credential') {
                             showAlert('error', 'Contraseña incorrecta. Intenta de nuevo.');
@@ -944,9 +959,11 @@
             setButtonLoading('btnVerifyLogin', true);
             try {
                 await confirmationResultLogin.confirm(code);
+                console.log('✅ Login OTP verificado correctamente');
                 showAlert('success', '¡Verificado! Redirigiendo...');
-                setTimeout(function() { window.location.href = 'dashboard.html'; }, 1200);
+                redirectToDashboard(1200);
             } catch (err) {
+                console.error('❌ Login OTP error:', err);
                 showAlert('error', 'Código incorrecto. Intenta de nuevo.');
                 clearOTP('loginOtpGroup');
             }
@@ -1005,6 +1022,12 @@
             setButtonLoading('btnRegister', false);
         }
 
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ✅ FIX v1.4: verifyRegisterOTP — Redirect GARANTIZADO después de OTP OK
+        // El problema original: si linkWithCredential o Firestore .set() fallaban,
+        // el catch general capturaba el error y NUNCA se ejecutaba el redirect.
+        // Solución: envolver CADA operación post-OTP en su propio try/catch.
+        // ═════════════════════════════════════════════════════════════════════════════
         async function verifyRegisterOTP() {
             var code = getOTPValue('regOtpGroup');
             if (code.length !== 6) { showAlert('error', 'Ingresa el código completo de 6 dígitos.'); return; }
@@ -1012,10 +1035,12 @@
             setButtonLoading('btnVerifyRegister', true);
 
             try {
+                // ── PASO 1: Confirmar OTP (esto es lo crítico) ──
                 var result = await confirmationResultRegister.confirm(code);
                 var phoneUser = result.user;
+                console.log('✅ OTP de registro verificado. UID:', phoneUser.uid);
 
-                // Link email+password credential
+                // ── PASO 2: Intentar vincular email+password (NO bloquea redirect) ──
                 if (pendingRegData.email && pendingRegData.password) {
                     try {
                         var emailCredential = firebase.auth.EmailAuthProvider.credential(
@@ -1025,7 +1050,7 @@
                         await phoneUser.linkWithCredential(emailCredential);
                         console.log('✅ Email credential linked');
                     } catch (linkErr) {
-                        console.warn('Could not link email:', linkErr.message);
+                        console.warn('⚠️ Could not link email (no bloquea registro):', linkErr.message);
                     }
                 } else if (pendingRegData.password) {
                     var syntheticEmail = pendingRegData.phone.replace('+', '') + '@dontrading.app';
@@ -1038,26 +1063,35 @@
                         pendingRegData.email = pendingRegData.email || syntheticEmail;
                         console.log('✅ Synthetic email credential linked');
                     } catch (linkErr) {
-                        console.warn('Could not link synthetic email:', linkErr.message);
+                        console.warn('⚠️ Could not link synthetic email (no bloquea registro):', linkErr.message);
                     }
                 }
 
-                // Save user data in Firestore
-                await db.collection('users').doc(phoneUser.uid).set({
-                    name: pendingRegData.name || '',
-                    phone: pendingRegData.phone || '',
-                    email: pendingRegData.email || '',
-                    uid: phoneUser.uid,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    plan: 'free',
-                    verified: true
-                });
+                // ── PASO 3: Guardar datos en Firestore (NO bloquea redirect) ──
+                try {
+                    await db.collection('users').doc(phoneUser.uid).set({
+                        name: pendingRegData.name || '',
+                        phone: pendingRegData.phone || '',
+                        email: pendingRegData.email || '',
+                        uid: phoneUser.uid,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        plan: 'free',
+                        verified: true
+                    });
+                    console.log('✅ Datos de usuario guardados en Firestore');
+                } catch (firestoreErr) {
+                    console.error('⚠️ Error al guardar en Firestore (no bloquea redirect):', firestoreErr);
+                    // El usuario ya está autenticado, el redirect DEBE continuar
+                }
 
+                // ── PASO 4: REDIRECT GARANTIZADO ──
+                // Si llegamos aquí, el OTP fue correcto y el usuario está autenticado
                 showAlert('success', '¡Cuenta creada exitosamente! Redirigiendo...');
-                setTimeout(function() { window.location.href = 'dashboard.html'; }, 1500);
+                redirectToDashboard(1500);
 
             } catch (err) {
-                console.error('Verify register error:', err);
+                // Este catch SOLO se activa si el OTP es incorrecto/inválido
+                console.error('❌ Verify register error:', err);
                 if (err.code === 'auth/invalid-verification-code') {
                     showAlert('error', 'Código incorrecto. Intenta de nuevo.');
                     clearOTP('regOtpGroup');
@@ -1126,15 +1160,18 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // AUTH STATE OBSERVER
+        // AUTH STATE OBSERVER — ✅ FIX v1.4: Auto-redirect habilitado
         // ═════════════════════════════════════════════════════════════════════════════
         auth.onAuthStateChanged(function(user) {
             if (user) {
                 console.log('👤 User detected:', user.uid);
-                if (!document.getElementById('registerVerify').classList.contains('active') &&
-                    !document.getElementById('loginVerify').classList.contains('active')) {
-                    // Uncomment for auto-redirect:
-                    // window.location.href = 'dashboard.html';
+                // Solo auto-redirigir si NO estamos en medio de verificación OTP
+                var isVerifyingRegister = document.getElementById('registerVerify').classList.contains('active');
+                var isVerifyingLogin = document.getElementById('loginVerify').classList.contains('active');
+
+                if (!isVerifyingRegister && !isVerifyingLogin) {
+                    console.log('🚀 Auto-redirect: usuario ya autenticado, redirigiendo...');
+                    window.location.href = 'dashboard.html';
                 }
             }
         });
@@ -1142,10 +1179,11 @@
         // ═════════════════════════════════════════════════════════════════════════════
         // INIT LOG
         // ═════════════════════════════════════════════════════════════════════════════
-        console.log('🔐 DONTRADING Login v1.3 — Firebase: dontrading-pro');
+        console.log('🔐 DONTRADING Login v1.4 — Firebase: dontrading-pro');
         console.log('📱 Phone provider: Enabled');
         console.log('🔥 Firebase project: dontrading-pro (Plan Blaze)');
         console.log('🌐 Auth language: ' + auth.languageCode);
+        console.log('✅ Redirect fix: ACTIVO');
     </script>
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
 </body>
