@@ -1,0 +1,1069 @@
+<!-- Declaración del tipo de documento HTML5 -->
+<!DOCTYPE html>
+<!-- Elemento raíz del documento, idioma español -->
+<html lang="es">
+<head>
+  <!-- Codificación de caracteres UTF-8 para soporte de acentos y caracteres especiales -->
+  <meta charset="UTF-8">
+  <!-- Meta viewport para que sea responsive en dispositivos móviles -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Título que aparece en la pestaña del navegador -->
+  <title>DonTrading — Loading</title>
+  <!-- Importación de 3 fuentes de Google Fonts:
+      - Instrument Serif: fuente elegante para el nombre de la marca
+      - DM Mono: fuente monoespaciada para datos técnicos y estados
+      - Sora: fuente sans-serif moderna para texto general -->
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&family=Sora:wght@200;300;400;600;700&display=swap" rel="stylesheet">
+  <!--================================================-->
+  <style>
+
+    /* ============================================
+      VARIABLES CSS GLOBALES
+      Definimos todos los colores del tema aquí
+      para poder cambiarlos fácilmente en un solo lugar
+      ============================================ */
+    :root {
+      /* Color de fondo principal - negro casi puro */
+      --bg-primary: #07080A;
+      /* Color de fondo secundario - negro un poco más claro */
+      --bg-secondary: #0D0F13;
+      /* Color dorado principal - para acentos importantes */
+      --accent-gold: #C9A84C;
+      /* Color dorado oscuro - para acentos secundarios */
+      --accent-gold-dim: #8B7233;
+      /* Color esmeralda/verde - para indicadores positivos */
+      --accent-emerald: #34D399;
+      /* Color de texto principal - blanco cálido */
+      --text-primary: #F0EDE6;
+      /* Color de texto tenue - para texto secundario */
+      --text-dim: #5A5D63;
+      /* Color de texto muy tenue - para decoraciones sutiles */
+      --text-muted: #2A2D33;
+      /* Resplandor dorado semi-transparente - para efectos de glow */
+      --glow-gold: rgba(201, 168, 76, 0.15);
+      /* Resplandor esmeralda semi-transparente - para efectos de glow verde */
+      --glow-emerald: rgba(52, 211, 153, 0.08);
+    }
+
+    /* ============================================
+      RESET CSS
+      Elimina márgenes, paddings y establece
+      box-sizing para todos los elementos
+      ============================================ */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* ============================================
+      ESTILOS DEL BODY
+      Configuración base de la página completa
+      ============================================ */
+    body {
+      /* Fondo oscuro principal */
+      background: var(--bg-primary);
+      /* Color de texto por defecto */
+      color: var(--text-primary);
+      /* Fuente principal del sitio */
+      font-family: 'Sora', sans-serif;
+      /* Oculta las barras de scroll durante la animación */
+      overflow: hidden;
+      /* Ocupa toda la ventana del navegador */
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ============================================
+      CANVAS DE PARTÍCULAS DE FONDO
+      Este canvas se usa para dibujar las partículas
+      animadas y sus conexiones con JavaScript
+      ============================================ */
+    #bgCanvas {
+      /* Se fija en la ventana para que no se mueva con el scroll */
+      position: fixed;
+      /* Se posiciona en la esquina superior izquierda */
+      top: 0;
+      left: 0;
+      /* Ocupa todo el ancho y alto */
+      width: 100%;
+      height: 100%;
+      /* z-index bajo para que quede detrás de todo */
+      z-index: 0;
+      /* Semi-transparente para que sea sutil */
+      opacity: 0.4;
+    }
+
+    /* ============================================
+      REJILLA/GRID DECORATIVA
+      Crea un patrón de cuadrícula sutil sobre
+      el fondo, dando aspecto de terminal/tech
+      ============================================ */
+    .grid-overlay {
+      /* Fijo en la ventana */
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      /* Por encima del canvas pero debajo del contenido */
+      z-index: 1;
+      /* Dos gradientes lineales que forman la cuadrícula:
+        - Uno horizontal (líneas que van de izq a der)
+        - Uno vertical (líneas que van de arriba a abajo) */
+      background-image:
+        linear-gradient(rgba(201, 168, 76, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(201, 168, 76, 0.03) 1px, transparent 1px);
+      /* Tamaño de cada celda de la cuadrícula: 60x60 píxeles */
+      background-size: 60px 60px;
+      /* Animación de pulso que hace que la rejilla respire */
+      animation: gridPulse 4s ease-in-out infinite;
+    }
+
+    /* Keyframes para el pulso de la rejilla:
+      va de opacidad 0.3 a 0.6 y regresa */
+    @keyframes gridPulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.6; }
+    }
+
+    /* ============================================
+      CONTENEDOR PRINCIPAL DEL SPLASH
+      Centra todo el contenido vertical y
+      horizontalmente en la pantalla
+      ============================================ */
+    .splash-container {
+      /* Relativo para que los hijos absolutos se posicionen respecto a él */
+      position: relative;
+      /* Por encima de todos los efectos de fondo */
+      z-index: 10;
+      /* Flexbox para centrar todo */
+      display: flex;
+      /* Los elementos se apilan verticalmente */
+      flex-direction: column;
+      /* Centrado horizontal */
+      align-items: center;
+      /* Centrado vertical */
+      justify-content: center;
+      /* Ocupa toda la pantalla */
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ============================================
+      ICONO DEL LOGO - Barras de gráfico animadas
+      Son 5 barras que simulan un gráfico de barras
+      y crecen de abajo hacia arriba
+      ============================================ */
+    .logo-icon {
+      /* Flexbox para alinear las barras lado a lado */
+      display: flex;
+      /* Las barras se alinean por abajo (como un gráfico) */
+      align-items: flex-end;
+      /* Espacio entre cada barra */
+      gap: 5px;
+      /* Altura total del contenedor de barras */
+      height: 50px;
+      /* Espacio debajo del icono */
+      margin-bottom: 40px;
+      /* Empieza invisible */
+      opacity: 0;
+      /* Aparece con animación de fade + slide hacia arriba
+        - Duración: 0.8s
+        - Curva: cubic-bezier suave
+        - Delay: 0.2s (empieza después de 0.2 segundos)
+        - forwards: mantiene el estado final */
+      animation: fadeSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+    }
+
+    /* Estilo base para cada barra individual del logo */
+    .logo-bar {
+      /* Ancho de cada barra */
+      width: 8px;
+      /* Bordes redondeados solo arriba */
+      border-radius: 3px 3px 0 0;
+      /* Degradado dorado de arriba (claro) a abajo (oscuro) */
+      background: linear-gradient(180deg, var(--accent-gold), var(--accent-gold-dim));
+      /* El punto de origen de la transformación es abajo (crece hacia arriba) */
+      transform-origin: bottom;
+      /* Animación de crecimiento */
+      animation: barGrow 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Barra 1: altura 20px, empieza en escala 0, delay 0.5s */
+    .logo-bar:nth-child(1) { height: 20px; animation-delay: 0.5s; transform: scaleY(0); }
+    /* Barra 2: altura 35px, delay 0.65s */
+    .logo-bar:nth-child(2) { height: 35px; animation-delay: 0.65s; transform: scaleY(0); }
+    /* Barra 3: altura 25px, delay 0.8s */
+    .logo-bar:nth-child(3) { height: 25px; animation-delay: 0.8s; transform: scaleY(0); }
+    /* Barra 4: altura 45px (la más alta), delay 0.95s, COLOR VERDE para destacar */
+    .logo-bar:nth-child(4) { height: 45px; animation-delay: 0.95s; transform: scaleY(0); background: linear-gradient(180deg, var(--accent-emerald), #1a9e6e); }
+    /* Barra 5: altura 30px, delay 1.1s */
+    .logo-bar:nth-child(5) { height: 30px; animation-delay: 1.1s; transform: scaleY(0); }
+
+    /* Keyframes para el crecimiento de las barras:
+      de escala vertical 0 (invisible) a 1 (tamaño completo) */
+    @keyframes barGrow {
+      0% { transform: scaleY(0); }
+      100% { transform: scaleY(1); }
+    }
+
+    /* ============================================
+      NOMBRE DE LA MARCA - "DonTrading"
+      Cada letra se revela individualmente con
+      un efecto 3D de rotación + blur
+      ============================================ */
+    .brand-name {
+      /* Fuente serif elegante para el nombre */
+      font-family: 'Instrument Serif', serif;
+      /* Tamaño responsive: mínimo 3rem, ideal 8vw, máximo 7rem */
+      font-size: clamp(3rem, 8vw, 7rem);
+      /* Espaciado entre letras ligeramente negativo para elegancia */
+      letter-spacing: -0.02em;
+      /* Altura de línea ajustada */
+      line-height: 1;
+      /* Espacio debajo */
+      margin-bottom: 12px;
+      /* Oculta las letras que aún no se han revelado */
+      overflow: hidden;
+    }
+
+    /* Cada letra individual del nombre de la marca */
+    .brand-name .letter {
+      /* inline-block permite aplicar transformaciones a cada letra */
+      display: inline-block;
+      /* Empieza invisible */
+      opacity: 0;
+      /* Empieza desplazada 80px abajo y rotada -90° en el eje X */
+      transform: translateY(80px) rotateX(-90deg);
+      /* Animación de revelación de cada letra
+        (el delay se asigna dinámicamente con JavaScript) */
+      animation: letterReveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Letras doradas (D y T) */
+    .brand-name .letter.gold {
+      /* Color dorado */
+      color: var(--accent-gold);
+      /* Doble resplandor dorado alrededor del texto */
+      text-shadow: 0 0 40px var(--glow-gold), 0 0 80px rgba(201, 168, 76, 0.08);
+    }
+
+    /* Letras blancas (el resto) */
+    .brand-name .letter.white {
+      color: var(--text-primary);
+    }
+
+    /* Keyframes para la revelación de cada letra:
+      - Empieza: invisible, desplazada abajo, rotada, borrosa
+      - Termina: visible, en posición, sin rotación, nítida */
+    @keyframes letterReveal {
+      0% {
+        opacity: 0;
+        transform: translateY(80px) rotateX(-90deg);
+        filter: blur(10px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) rotateX(0);
+        filter: blur(0);
+      }
+    }
+
+    /* ============================================
+      TAGLINE / ESLOGAN
+      Texto pequeño debajo del nombre:
+      "Trading Intelligence Platform"
+      ============================================ */
+    .tagline {
+      /* Fuente monoespaciada para aspecto técnico */
+      font-family: 'DM Mono', monospace;
+      /* Tamaño responsive */
+      font-size: clamp(0.65rem, 1.5vw, 0.85rem);
+      /* Peso ligero */
+      font-weight: 300;
+      /* Amplio espaciado entre letras para estilo elegante */
+      letter-spacing: 0.35em;
+      /* Todo en mayúsculas */
+      text-transform: uppercase;
+      /* Color tenue */
+      color: var(--text-dim);
+      /* Empieza invisible */
+      opacity: 0;
+      /* Aparece con fade + slide después de 2 segundos */
+      animation: fadeSlideUp 1s cubic-bezier(0.16, 1, 0.3, 1) 2s forwards;
+      /* Espacio debajo */
+      margin-bottom: 60px;
+    }
+
+    /* ============================================
+      SECCIÓN DE LA BARRA DE CARGA
+      Contiene la barra de progreso, el label
+      de texto y el porcentaje
+      ============================================ */
+    .loading-section {
+      /* Flexbox vertical */
+      display: flex;
+      flex-direction: column;
+      /* Centrado horizontal */
+      align-items: center;
+      /* Espacio entre la barra y el texto */
+      gap: 16px;
+      /* Empieza invisible */
+      opacity: 0;
+      /* Aparece con animación después de 2.3 segundos */
+      animation: fadeSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 2.3s forwards;
+    }
+
+    /* Pista/track de la barra de carga (el fondo gris) */
+    .loading-track {
+      /* Ancho fijo */
+      width: 280px;
+      /* Muy delgada para un look minimalista */
+      height: 2px;
+      /* Color gris oscuro de fondo */
+      background: var(--text-muted);
+      /* Bordes redondeados */
+      border-radius: 2px;
+      /* Oculta el relleno que sobresalga */
+      overflow: hidden;
+      /* Posición relativa para el fill absoluto */
+      position: relative;
+    }
+
+    /* Relleno de la barra de carga (la parte que se llena) */
+    .loading-fill {
+      /* Ocupa todo el alto de la pista */
+      height: 100%;
+      /* Empieza en 0% de ancho (vacía) */
+      width: 0%;
+      /* Degradado de dorado oscuro → dorado → esmeralda */
+      background: linear-gradient(90deg, var(--accent-gold-dim), var(--accent-gold), var(--accent-emerald));
+      /* Bordes redondeados */
+      border-radius: 2px;
+      /* Transición suave cuando cambia el ancho */
+      transition: width 0.1s linear;
+      /* Efecto de resplandor alrededor de la barra */
+      box-shadow: 0 0 15px var(--glow-gold), 0 0 30px rgba(201, 168, 76, 0.1);
+    }
+
+    /* Contenedor de la info debajo de la barra (texto + porcentaje) */
+    .loading-info {
+      /* Flexbox horizontal */
+      display: flex;
+      align-items: center;
+      /* El texto va a la izquierda, el % a la derecha */
+      justify-content: space-between;
+      /* Mismo ancho que la barra */
+      width: 280px;
+    }
+
+    /* Texto de estado de carga (ej: "Loading market modules...") */
+    .loading-text {
+      /* Fuente monoespaciada */
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 300;
+      /* Color tenue */
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+    }
+
+    /* Porcentaje de carga (ej: "45%") */
+    .loading-percent {
+      /* Fuente monoespaciada */
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      /* Un poco más grueso para destacar */
+      font-weight: 500;
+      /* Color dorado para que resalte */
+      color: var(--accent-gold);
+      letter-spacing: 0.05em;
+    }
+
+    /* ============================================
+      MENSAJES DE ESTADO
+      Textos que van cambiando debajo de la barra
+      como "Connecting to Polygon.io WebSocket"
+      ============================================ */
+    .status-messages {
+      /* Espacio arriba */
+      margin-top: 30px;
+      /* Altura fija para que no salte el layout */
+      height: 20px;
+      /* Empieza invisible */
+      opacity: 0;
+      /* Aparece después de 2.5 segundos */
+      animation: fadeSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 2.5s forwards;
+    }
+
+    /* Cada mensaje de estado individual */
+    .status-msg {
+      /* Fuente monoespaciada */
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      /* Color tenue */
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+      /* Empieza invisible */
+      opacity: 0;
+      /* Transición suave al aparecer/desaparecer */
+      transition: opacity 0.4s ease;
+      /* Posición absoluta para que se superpongan en el mismo lugar */
+      position: absolute;
+      /* Centrado horizontal */
+      left: 50%;
+      transform: translateX(-50%);
+      /* Evita que el texto se corte en varias líneas */
+      white-space: nowrap;
+    }
+
+    /* Estado activo: el mensaje que se está mostrando actualmente */
+    .status-msg.active {
+      opacity: 1;
+    }
+
+    /* Punto verde pulsante al lado de cada mensaje de estado */
+    .status-msg .dot {
+      display: inline-block;
+      /* Tamaño del punto */
+      width: 5px;
+      height: 5px;
+      /* Forma circular */
+      border-radius: 50%;
+      /* Color esmeralda/verde */
+      background: var(--accent-emerald);
+      /* Espacio entre el punto y el texto */
+      margin-right: 8px;
+      /* Alinea verticalmente con el texto */
+      vertical-align: middle;
+      /* Animación de pulso infinita */
+      animation: dotPulse 1.5s ease-in-out infinite;
+    }
+
+    /* Keyframes del pulso del punto verde:
+      alterna entre opacidad baja/tamaño pequeño y opacidad alta/tamaño grande */
+    @keyframes dotPulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+
+    /* ============================================
+      DECORACIONES DE ESQUINAS
+      Textos pequeños en las 4 esquinas de la pantalla
+      que dan aspecto de interfaz profesional/terminal
+      ============================================ */
+    .corner {
+      /* Fijo en la ventana */
+      position: fixed;
+      /* Por encima del fondo pero debajo del contenido principal */
+      z-index: 5;
+      /* Fuente monoespaciada para aspecto de terminal */
+      font-family: 'DM Mono', monospace;
+      /* Tamaño muy pequeño */
+      font-size: 0.6rem;
+      /* Color muy tenue, casi invisible */
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      /* Empieza invisible */
+      opacity: 0;
+      /* Aparece con fade después de 2.8 segundos */
+      animation: fadeIn 1s ease 2.8s forwards;
+    }
+
+    /* Esquina superior izquierda */
+    .corner-tl { top: 30px; left: 30px; }
+    /* Esquina superior derecha */
+    .corner-tr { top: 30px; right: 30px; text-align: right; }
+    /* Esquina inferior izquierda */
+    .corner-bl { bottom: 30px; left: 30px; }
+    /* Esquina inferior derecha */
+    .corner-br { bottom: 30px; right: 30px; text-align: right; }
+
+    /* Color dorado para los valores destacados en las esquinas */
+    .corner .highlight { color: var(--accent-gold-dim); }
+
+    /* ============================================
+      EFECTO DE LÍNEA DE ESCANEO
+      Una línea horizontal dorada que baja por
+      toda la pantalla continuamente, como un
+      escáner o monitor CRT
+      ============================================ */
+    .scanline {
+      /* Fija en la ventana */
+      position: fixed;
+      top: 0;
+      left: 0;
+      /* Ocupa todo el ancho */
+      width: 100%;
+      /* Muy delgada */
+      height: 3px;
+      /* Degradado: transparente → dorado → transparente */
+      background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+      /* Muy sutil */
+      opacity: 0.15;
+      /* Por encima de la rejilla */
+      z-index: 2;
+      /* Animación: baja desde arriba hasta abajo en 3 segundos, repite infinitamente */
+      animation: scanDown 3s linear infinite;
+      /* No interfiere con clicks del usuario */
+      pointer-events: none;
+    }
+
+    /* Keyframes del escaneo: se mueve desde -10px arriba hasta el fondo de la pantalla */
+    @keyframes scanDown {
+      0% { transform: translateY(-10px); }
+      100% { transform: translateY(100vh); }
+    }
+
+    /* ============================================
+      ANIMACIÓN DE SALIDA (FADE OUT)
+      Se activa cuando la carga llega al 100%
+      para hacer la transición hacia el dashboard
+      ============================================ */
+
+    /* Fade out del contenedor principal con efecto de zoom + blur */
+    .splash-container.fade-out {
+      animation: fadeOutScale 1s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+    }
+
+    /* Keyframes del fade out:
+      - Empieza: visible, tamaño normal, nítido
+      - Termina: invisible, ligeramente más grande (zoom), borroso */
+    @keyframes fadeOutScale {
+      0% { opacity: 1; transform: scale(1); filter: blur(0); }
+      100% { opacity: 0; transform: scale(1.05); filter: blur(8px); }
+    }
+
+    /* Fade out simple para la rejilla, esquinas y scanline */
+    .grid-overlay.fade-out,
+    .corner.fade-out,
+    .scanline.fade-out {
+      animation: fadeOut 0.6s ease forwards;
+    }
+
+    /* ============================================
+      ANIMACIONES UTILITARIAS
+      Keyframes reutilizables en varias partes
+      ============================================ */
+
+    /* Fade in + deslizamiento hacia arriba (entrada de elementos) */
+    @keyframes fadeSlideUp {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Fade in simple (aparición gradual) */
+    @keyframes fadeIn {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    /* Fade out simple (desaparición gradual) */
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* ============================================
+      LÍNEA DECORATIVA HORIZONTAL
+      Pequeña línea dorada entre el nombre y el tagline
+      que se expande desde el centro
+      ============================================ */
+    .accent-line {
+      /* Ancho final de la línea */
+      width: 60px;
+      /* Muy delgada */
+      height: 1px;
+      /* Degradado: transparente → dorado → transparente */
+      background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+      /* Espacio debajo */
+      margin-bottom: 20px;
+      /* Empieza invisible */
+      opacity: 0;
+      /* Se expande desde ancho 0 hasta 60px después de 1.8 segundos */
+      animation: expandLine 1s cubic-bezier(0.16, 1, 0.3, 1) 1.8s forwards;
+    }
+
+    /* Keyframes de la expansión de la línea */
+    @keyframes expandLine {
+      0% { opacity: 0; width: 0; }
+      100% { opacity: 1; width: 60px; }
+    }
+
+    /* ============================================
+      RESPONSIVE - PANTALLAS PEQUEÑAS
+      Ajustes para dispositivos móviles (< 600px)
+      ============================================ */
+    @media (max-width: 600px) {
+      /* Oculta las decoraciones de esquina en móvil (no caben bien) */
+      .corner { display: none; }
+      /* Reduce el ancho de la barra de carga */
+      .loading-track, .loading-info { width: 220px; }
+    }
+
+  </style>
+  <!--================================================-->
+</head>
+<body>
+  <!--================================================-->
+  <!-- Canvas donde se dibujan las partículas animadas con JavaScript -->
+  <canvas id="bgCanvas"></canvas>
+
+  <!-- Capa de rejilla/cuadrícula decorativa -->
+  <div class="grid-overlay"></div>
+
+  <!-- Línea de escaneo que baja continuamente -->
+  <div class="scanline"></div>
+
+  <!-- ============================================
+      DECORACIONES DE ESQUINAS
+      Información de sistema simulada para dar
+      aspecto de interfaz profesional
+      ============================================ -->
+  <!-- Esquina superior izquierda: versión del sistema -->
+  <div class="corner corner-tl">SYS <span class="highlight">v4.2.1</span></div>
+  <!-- Esquina superior derecha: ID de sesión (se genera con JS) -->
+  <div class="corner corner-tr">SESSION <span class="highlight" id="sessionId">—</span></div>
+  <!-- Esquina inferior izquierda: protocolo de seguridad -->
+  <div class="corner corner-bl">PROTOCOL <span class="highlight">SECURE</span></div>
+  <!-- Esquina inferior derecha: reloj en tiempo real (se actualiza con JS) -->
+  <div class="corner corner-br"><span class="highlight" id="clockDisplay">—</span></div>
+
+  <!-- ============================================
+      CONTENEDOR PRINCIPAL DEL SPLASH SCREEN
+      Todo el contenido central de la pantalla
+      de carga está aquí dentro
+      ============================================ -->
+  <div class="splash-container" id="splashContainer">
+
+    <!-- Icono del logo: 5 barras que simulan un gráfico bursátil -->
+    <div class="logo-icon">
+      <div class="logo-bar"></div>
+      <div class="logo-bar"></div>
+      <div class="logo-bar"></div>
+      <div class="logo-bar"></div>
+      <div class="logo-bar"></div>
+    </div>
+
+    <!-- Nombre de la marca: las letras se insertan dinámicamente con JS -->
+    <div class="brand-name" id="brandName"></div>
+
+    <!-- Línea decorativa horizontal dorada -->
+    <div class="accent-line"></div>
+
+    <!-- Eslogan de la empresa -->
+    <div class="tagline">Trading Intelligence Platform</div>
+
+    <!-- Sección de la barra de carga -->
+    <div class="loading-section">
+      <!-- Pista (fondo gris) de la barra -->
+      <div class="loading-track">
+        <!-- Relleno que se va llenando progresivamente -->
+        <div class="loading-fill" id="loadingFill"></div>
+      </div>
+      <!-- Información debajo de la barra -->
+      <div class="loading-info">
+        <!-- Texto descriptivo de qué se está cargando -->
+        <span class="loading-text" id="loadingLabel">Initializing...</span>
+        <!-- Porcentaje numérico -->
+        <span class="loading-percent" id="loadingPercent">0%</span>
+      </div>
+    </div>
+
+    <!-- Contenedor de mensajes de estado (se llenan dinámicamente con JS) -->
+    <div class="status-messages" id="statusMessages"></div>
+
+  </div>
+  <!--================================================-->
+  <script>
+
+    // ================================================
+    // SECCIÓN 1: PARTÍCULAS DE FONDO (CANVAS)
+    // Crea un efecto de partículas flotantes conectadas
+    // por líneas, similar a una red neuronal
+    // ================================================
+
+    // Obtiene referencia al elemento canvas del DOM
+    const canvas = document.getElementById('bgCanvas');
+
+    // Obtiene el contexto 2D para poder dibujar en el canvas
+    const ctx = canvas.getContext('2d');
+
+    // Array que almacenará todas las partículas
+    let particles = [];
+
+    // Variable para guardar el ID de la animación (para poder cancelarla si es necesario)
+    let animId;
+
+    // Función que ajusta el tamaño del canvas al tamaño de la ventana
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    // Ejecuta el resize inmediatamente al cargar la página
+    resizeCanvas();
+
+    // Escucha cambios de tamaño de ventana y reajusta el canvas
+    window.addEventListener('resize', resizeCanvas);
+
+    // ================================================
+    // Clase Particle: define el comportamiento de
+    // cada partícula individual
+    // ================================================
+    class Particle {
+      // Al crear una partícula, se inicializa con valores aleatorios
+      constructor() {
+        this.reset();
+      }
+
+      // Asigna valores aleatorios a todas las propiedades de la partícula
+      reset() {
+        // Posición X aleatoria dentro del canvas
+        this.x = Math.random() * canvas.width;
+        // Posición Y aleatoria dentro del canvas
+        this.y = Math.random() * canvas.height;
+        // Velocidad horizontal aleatoria (entre -0.15 y 0.15)
+        this.vx = (Math.random() - 0.5) * 0.3;
+        // Velocidad vertical aleatoria (entre -0.15 y 0.15)
+        this.vy = (Math.random() - 0.5) * 0.3;
+        // Radio aleatorio entre 0.5 y 2 píxeles
+        this.radius = Math.random() * 1.5 + 0.5;
+        // Transparencia aleatoria entre 0.1 y 0.6
+        this.alpha = Math.random() * 0.5 + 0.1;
+        // 30% de las partículas serán doradas, el 70% restante serán esmeralda
+        this.isGold = Math.random() > 0.7;
+      }
+
+      // Actualiza la posición de la partícula en cada frame
+      update() {
+        // Mueve la partícula según su velocidad
+        this.x += this.vx;
+        this.y += this.vy;
+        // Si sale por los bordes horizontales, invierte su dirección (rebota)
+        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+        // Si sale por los bordes verticales, invierte su dirección (rebota)
+        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+      }
+
+      // Dibuja la partícula como un círculo en el canvas
+      draw() {
+        // Inicia un nuevo trazo
+        ctx.beginPath();
+        // Dibuja un círculo en la posición (x, y) con el radio definido
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        // Elige color según si es dorada o esmeralda
+        ctx.fillStyle = this.isGold
+          ? `rgba(201, 168, 76, ${this.alpha})`       // Color dorado
+          : `rgba(52, 211, 153, ${this.alpha * 0.5})`; // Color esmeralda (más tenue)
+        // Rellena el círculo con el color elegido
+        ctx.fill();
+      }
+    }
+
+    // Crea 80 partículas y las añade al array
+    for (let i = 0; i < 80; i++) particles.push(new Particle());
+
+    // ================================================
+    // Dibuja las conexiones (líneas) entre partículas
+    // que están cerca, creando el efecto de red/malla
+    // ================================================
+    function drawConnections() {
+      // Compara cada par de partículas (sin repetir)
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          // Calcula la diferencia en X entre las dos partículas
+          const dx = particles[i].x - particles[j].x;
+          // Calcula la diferencia en Y entre las dos partículas
+          const dy = particles[i].y - particles[j].y;
+          // Calcula la distancia usando el teorema de Pitágoras
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          // Solo dibuja línea si están a menos de 150 píxeles de distancia
+          if (dist < 150) {
+            // Inicia un nuevo trazo para la línea
+            ctx.beginPath();
+            // Punto de inicio: posición de la partícula i
+            ctx.moveTo(particles[i].x, particles[i].y);
+            // Punto final: posición de la partícula j
+            ctx.lineTo(particles[j].x, particles[j].y);
+            // La opacidad de la línea disminuye con la distancia
+            // Más cerca = más visible, más lejos = más transparente
+            ctx.strokeStyle = `rgba(201, 168, 76, ${0.06 * (1 - dist / 150)})`;
+            // Línea muy delgada
+            ctx.lineWidth = 0.5;
+            // Dibuja la línea
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // ================================================
+    // Loop de animación principal para las partículas
+    // Se ejecuta aproximadamente 60 veces por segundo
+    // ================================================
+    function animateParticles() {
+      // Limpia todo el canvas (borra el frame anterior)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Actualiza la posición y dibuja cada partícula
+      particles.forEach(p => { p.update(); p.draw(); });
+      // Dibuja las líneas de conexión entre partículas cercanas
+      drawConnections();
+      // Solicita el siguiente frame de animación (crea un bucle infinito)
+      animId = requestAnimationFrame(animateParticles);
+    }
+
+    // Inicia la animación de partículas
+    animateParticles();
+
+    // ================================================
+    // SECCIÓN 2: REVELACIÓN LETRA POR LETRA
+    // Toma el texto "DonTrading" y crea un <span>
+    // por cada letra con una animación escalonada
+    // ================================================
+
+    // El texto completo que se va a mostrar letra por letra
+    const brandText = 'DonTrading';
+
+    // Referencia al contenedor vacío donde se insertarán las letras
+    const brandEl = document.getElementById('brandName');
+
+    // Array con las letras que deben ser doradas (la D y la T)
+    const goldLetters = ['D', 'T'];
+
+    // Recorre cada carácter del texto "DonTrading"
+    brandText.split('').forEach((char, i) => {
+      // Crea un elemento <span> para esta letra
+      const span = document.createElement('span');
+      // Si la letra está en goldLetters, le pone clase 'gold', si no, 'white'
+      span.className = `letter ${goldLetters.includes(char) ? 'gold' : 'white'}`;
+      // Establece el contenido del span como la letra actual
+      span.textContent = char;
+      // Asigna un delay escalonado: cada letra aparece 0.08s después de la anterior
+      // La primera letra (i=0) empieza en 0.8s, la segunda en 0.88s, etc.
+      span.style.animationDelay = `${0.8 + i * 0.08}s`;
+      // Añade el span al contenedor del nombre
+      brandEl.appendChild(span);
+    });
+
+    // ================================================
+    // SECCIÓN 3: DETALLES DE LAS ESQUINAS
+    // Genera un ID de sesión aleatorio y mantiene
+    // un reloj actualizado cada segundo
+    // ================================================
+
+    // Genera un ID de sesión aleatorio de 6 caracteres alfanuméricos en mayúsculas
+    // Ejemplo: "A3F7K2", "X9B2M1", etc.
+    document.getElementById('sessionId').textContent =
+      Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    // Función que actualiza el reloj en la esquina inferior derecha
+    function updateClock() {
+      // Obtiene la fecha/hora actual del sistema
+      const now = new Date();
+      // Formatea las horas con cero a la izquierda si es necesario (ej: "09")
+      const h = String(now.getHours()).padStart(2, '0');
+      // Formatea los minutos
+      const m = String(now.getMinutes()).padStart(2, '0');
+      // Formatea los segundos
+      const s = String(now.getSeconds()).padStart(2, '0');
+      // Actualiza el texto del reloj con formato HH:MM:SS
+      document.getElementById('clockDisplay').textContent = `${h}:${m}:${s}`;
+    }
+
+    // Ejecuta inmediatamente para que se vea la hora desde el inicio (no el "—")
+    updateClock();
+
+    // Programa actualización del reloj cada 1000 milisegundos (1 segundo)
+    setInterval(updateClock, 1000);
+
+    // ================================================
+    // SECCIÓN 4: SECUENCIA DE CARGA
+    // Define las fases de carga simulada y los
+    // mensajes de estado que se van mostrando
+    // ================================================
+
+    // Array de fases: cada una tiene un texto descriptivo (label),
+    // un porcentaje de inicio (start) y uno de fin (end)
+    const phases = [
+      { label: 'Establishing connection...', start: 0, end: 15 },    // Fase 1: 0% → 15%
+      { label: 'Loading market modules...', start: 15, end: 35 },    // Fase 2: 15% → 35%
+      { label: 'Syncing data feeds...', start: 35, end: 55 },        // Fase 3: 35% → 55%
+      { label: 'Initializing analytics...', start: 55, end: 75 },    // Fase 4: 55% → 75%
+      { label: 'Preparing dashboard...', start: 75, end: 90 },       // Fase 5: 75% → 90%
+      { label: 'Almost ready...', start: 90, end: 100 },             // Fase 6: 90% → 100%
+    ];
+
+    // Textos de estado más detallados que aparecen con el punto verde debajo de la barra
+    const statusTexts = [
+      'Connecting to Polygon.io WebSocket',   // Se muestra durante la fase 1
+      'Fetching real-time market data',       // Se muestra durante la fase 2
+      'Loading S&P 500 watchlist',            // Se muestra durante la fase 3
+      'Initializing chart engine',            // Se muestra durante la fase 4
+      'Compiling trading signals',            // Se muestra durante la fase 5
+      'Dashboard ready',                      // Se muestra durante la fase 6
+    ];
+
+    // === Referencias a los elementos del DOM que se actualizan dinámicamente ===
+
+    // La barra de relleno (el color que avanza)
+    const fillEl = document.getElementById('loadingFill');
+    // El texto del porcentaje (ej: "45%")
+    const percentEl = document.getElementById('loadingPercent');
+    // El texto descriptivo de la fase (ej: "Loading market modules...")
+    const labelEl = document.getElementById('loadingLabel');
+    // El contenedor donde van los mensajes de estado con punto verde
+    const statusContainer = document.getElementById('statusMessages');
+
+    // === Variables de control del progreso ===
+
+    // Progreso actual mostrado en pantalla (se interpola suavemente hacia el target)
+    let currentProgress = 0;
+    // Progreso objetivo que define la fase actual
+    let targetProgress = 0;
+    // Índice de la fase actual (0 a 5)
+    let currentPhase = 0;
+    // Índice del mensaje de estado actual (no se usa directamente, se usa currentPhase)
+    let statusIndex = 0;
+
+    // Crea los elementos HTML para cada mensaje de estado
+    statusTexts.forEach((text, i) => {
+      // Crea un <div> para cada mensaje
+      const el = document.createElement('div');
+      // Asigna la clase base (invisible por defecto)
+      el.className = 'status-msg';
+      // Incluye el punto verde pulsante (<span class="dot">) + el texto del estado
+      el.innerHTML = `<span class="dot"></span>${text}`;
+      // Lo añade al contenedor de mensajes de estado
+      statusContainer.appendChild(el);
+    });
+
+    // Obtiene una lista de todos los elementos de mensaje de estado creados
+    const statusEls = statusContainer.querySelectorAll('.status-msg');
+
+    // Función que muestra solo el mensaje de estado con el índice dado
+    // y oculta todos los demás
+    function showStatus(index) {
+      // Primero quita la clase 'active' de todos los mensajes (los oculta)
+      statusEls.forEach(el => el.classList.remove('active'));
+      // Luego añade 'active' solo al mensaje indicado (lo muestra)
+      if (statusEls[index]) statusEls[index].classList.add('active');
+    }
+
+    // Función que avanza a la siguiente fase de carga
+    function advancePhase() {
+      // Si ya pasamos todas las fases, no hace nada más
+      if (currentPhase >= phases.length) return;
+
+      // Obtiene los datos de la fase actual
+      const phase = phases[currentPhase];
+      // Actualiza el texto descriptivo debajo de la barra
+      labelEl.textContent = phase.label;
+      // Establece el nuevo porcentaje objetivo al que debe llegar la barra
+      targetProgress = phase.end;
+      // Muestra el mensaje de estado correspondiente a esta fase
+      showStatus(currentPhase);
+      // Incrementa el contador de fase para la próxima llamada
+      currentPhase++;
+
+      // Calcula un delay aleatorio entre 600ms y 1400ms para la siguiente fase
+      // Esto hace que la carga se sienta orgánica y natural, no mecánica
+      const nextDelay = 600 + Math.random() * 800;
+
+      // Si hay más fases pendientes, programa la siguiente con setTimeout
+      if (currentPhase < phases.length) {
+        setTimeout(advancePhase, nextDelay);
+      }
+    }
+
+    // Inicia la secuencia de fases después de 2.8 segundos
+    // Este delay permite que las animaciones del logo y nombre terminen primero
+    setTimeout(() => {
+      advancePhase();
+    }, 2800);
+
+    // ================================================
+    // Loop de animación del progreso de la barra
+    // Interpola suavemente el progreso actual hacia
+    // el progreso objetivo usando ease-out
+    // ================================================
+    function animateProgress() {
+      // Solo actualiza si el progreso actual es menor que el objetivo
+      if (currentProgress < targetProgress) {
+        // Fórmula de interpolación con ease-out:
+        // - Avanza un 6% de la diferencia restante (se desacelera al acercarse)
+        // - Más un mínimo de 0.15 (para que nunca se estanque completamente)
+        currentProgress += (targetProgress - currentProgress) * 0.06 + 0.15;
+
+        // Si nos pasamos del objetivo, lo limita al valor exacto
+        if (currentProgress > targetProgress) currentProgress = targetProgress;
+
+        // Redondea a número entero para mostrar (no queremos decimales en el %)
+        const rounded = Math.round(currentProgress);
+        // Actualiza el ancho visual de la barra de relleno
+        fillEl.style.width = rounded + '%';
+        // Actualiza el texto del porcentaje
+        percentEl.textContent = rounded + '%';
+      }
+
+      // Verifica si la carga llegó a ~100% y la transición no se ha disparado aún
+      if (currentProgress >= 99.5 && !window.loadingDone) {
+        // Marca como completado para no ejecutar esto de nuevo
+        window.loadingDone = true;
+        // Ajusta a exactamente 100%
+        currentProgress = 100;
+        fillEl.style.width = '100%';
+        percentEl.textContent = '100%';
+        // Cambia el texto a "Ready"
+        labelEl.textContent = 'Ready';
+
+        // Espera 800ms para que el usuario vea el "100% Ready"
+        // y luego ejecuta la transición al dashboard
+        setTimeout(transitionToDashboard, 800);
+      }
+
+      // Solicita el siguiente frame de animación (bucle continuo)
+      requestAnimationFrame(animateProgress);
+    }
+
+    // Inicia el loop de animación del progreso
+    animateProgress();
+
+    // ================================================
+    // SECCIÓN 5: TRANSICIÓN AL DASHBOARD
+    // Cuando la carga llega al 100%, todos los
+    // elementos hacen fade out con blur y zoom,
+    // y luego redirige al archivo dashboard.html
+    // ================================================
+    function transitionToDashboard() {
+      // Obtiene referencias a todos los elementos que deben desaparecer
+      const splash = document.getElementById('splashContainer');  // Contenido principal
+      const grid = document.querySelector('.grid-overlay');        // Rejilla de fondo
+      const corners = document.querySelectorAll('.corner');        // Las 4 esquinas
+      const scanline = document.querySelector('.scanline');        // Línea de escaneo
+
+      // Añade la clase 'fade-out' a cada elemento
+      // Esto activa las animaciones CSS de desaparición definidas arriba
+      splash.classList.add('fade-out');    // Fade + zoom + blur
+      grid.classList.add('fade-out');      // Fade simple
+      scanline.classList.add('fade-out');  // Fade simple
+      corners.forEach(c => c.classList.add('fade-out')); // Fade simple para cada esquina
+
+      // Después de 1 segundo (cuando las animaciones de fade out terminan)
+      // redirige al navegador hacia el dashboard
+      setTimeout(() => {
+        // =============================================
+        // 👇 CAMBIA ESTA URL POR LA RUTA DE TU DASHBOARD 👇
+        // Ejemplos:
+        //   'dashboard.html'              → archivo en la misma carpeta
+        //   '/pages/dashboard.html'       → ruta relativa al root
+        //   'https://tudominio.com/dash'  → URL completa
+        // =============================================
+        window.location.href = 'login.html';
+      }, 1000);
+    }
+  </script>
+</body>
+</html>
