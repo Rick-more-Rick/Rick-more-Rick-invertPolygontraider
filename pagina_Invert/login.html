@@ -10,7 +10,10 @@
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <style>
         /* ══════════════════════════════════════════════════════════════════════ */
-        /*                    DONTRADING LOGIN - CSS                             */
+        /*             DONTRADING LOGIN v2.1 — Multi-Provider Auth              */
+        /*   ✅ Google popup + redirect fallback                                */
+        /*   ✅ Email verification on register                                  */
+        /*   ✅ Detailed error logging                                          */
         /* ══════════════════════════════════════════════════════════════════════ */
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -19,6 +22,7 @@
             --bg-primary: #0a0e17;
             --bg-card: #111827;
             --bg-input: #0d1220;
+            --bg-hover: #151d2e;
             --accent: #f59e0b;
             --accent-soft: #d97706;
             --accent-glow: rgba(245, 158, 11, 0.15);
@@ -40,11 +44,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
+            overflow-x: hidden;
             position: relative;
         }
 
-        /* ── BACKGROUND EFFECTS ───────────────────────────────────────────── */
+        /* ── BACKGROUND ───────────────────────────────────────────────────── */
         body::before {
             content: '';
             position: fixed;
@@ -55,566 +59,528 @@
                 radial-gradient(ellipse 500px 500px at 80% 70%, rgba(59, 130, 246, 0.03) 0%, transparent 70%),
                 radial-gradient(ellipse 400px 300px at 50% 50%, rgba(245, 158, 11, 0.02) 0%, transparent 70%);
             animation: bgDrift 20s ease-in-out infinite alternate;
-            pointer-events: none;
-            z-index: 0;
+            pointer-events: none; z-index: 0;
         }
         @keyframes bgDrift {
             0% { transform: translate(0, 0) rotate(0deg); }
             100% { transform: translate(30px, -20px) rotate(2deg); }
         }
-
-        /* ── GRID PATTERN OVERLAY ─────────────────────────────────────────── */
         body::after {
             content: '';
-            position: fixed;
-            inset: 0;
+            position: fixed; inset: 0;
             background-image:
                 linear-gradient(rgba(245, 158, 11, 0.015) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(245, 158, 11, 0.015) 1px, transparent 1px);
             background-size: 60px 60px;
-            pointer-events: none;
-            z-index: 0;
+            pointer-events: none; z-index: 0;
         }
 
-        /* ── LOGIN CONTAINER ──────────────────────────────────────────────── */
+        /* ── CONTAINER ────────────────────────────────────────────────────── */
         .login-wrapper {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            max-width: 440px;
-            padding: 20px;
+            position: relative; z-index: 1;
+            width: 100%; max-width: 440px; padding: 20px;
         }
 
-        /* ── LOGO SECTION ─────────────────────────────────────────────────── */
-        .logo-section {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-
+        /* ── LOGO ─────────────────────────────────────────────────────────── */
+        .logo-section { text-align: center; margin-bottom: 32px; }
         .logo-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 64px; height: 64px;
-            border-radius: 18px;
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 64px; height: 64px; border-radius: 18px;
             background: linear-gradient(135deg, var(--accent), var(--accent-soft));
-            font-weight: 800;
-            font-size: 22px;
-            color: var(--bg-primary);
+            font-weight: 800; font-size: 22px; color: var(--bg-primary);
             margin-bottom: 16px;
             box-shadow: 0 8px 32px rgba(245, 158, 11, 0.2);
             position: relative;
         }
         .logo-badge::after {
-            content: '';
-            position: absolute;
-            inset: -3px;
-            border-radius: 20px;
+            content: ''; position: absolute; inset: -3px; border-radius: 20px;
             background: linear-gradient(135deg, var(--accent), transparent, var(--accent-soft));
-            z-index: -1;
-            opacity: 0.3;
-            filter: blur(8px);
+            z-index: -1; opacity: 0.3; filter: blur(8px);
         }
-
-        .logo-title {
-            font-size: 26px;
-            font-weight: 300;
-            color: var(--text-primary);
-            letter-spacing: -0.5px;
-        }
+        .logo-title { font-size: 26px; font-weight: 300; letter-spacing: -0.5px; }
         .logo-title .brand { font-weight: 800; }
         .logo-title .pro { font-style: italic; font-weight: 300; color: var(--accent); }
 
         /* ── CARD ──────────────────────────────────────────────────────────── */
         .auth-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 32px;
-            position: relative;
-            overflow: hidden;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 32px;
+            position: relative; overflow: hidden;
         }
         .auth-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
             background: linear-gradient(90deg, transparent, var(--accent), transparent);
             opacity: 0.4;
         }
 
-        /* ── VIEW SWITCHER (Login / Register) ─────────────────────────────── */
+        /* ── VIEW SWITCHER ────────────────────────────────────────────────── */
         .view-switcher {
-            display: flex;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 3px;
-            margin-bottom: 28px;
-            position: relative;
+            display: flex; background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 3px; margin-bottom: 24px;
         }
         .switch-btn {
-            flex: 1;
-            padding: 10px 0;
-            text-align: center;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-muted);
-            background: transparent;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            position: relative;
-            z-index: 1;
-            letter-spacing: 0.3px;
+            flex: 1; padding: 10px 0; text-align: center;
+            font-size: 13px; font-weight: 600; color: var(--text-muted);
+            background: transparent; border: none; border-radius: 8px;
+            cursor: pointer; transition: all 0.25s ease; letter-spacing: 0.3px;
         }
-        .switch-btn.active {
-            color: var(--bg-primary);
-            background: var(--accent);
+        .switch-btn.active { color: var(--bg-primary); background: var(--accent); }
+
+        /* ── GOOGLE BUTTON ────────────────────────────────────────────────── */
+        .btn-google {
+            width: 100%; height: 48px;
+            border: 1px solid var(--border-light); border-radius: 10px;
+            background: var(--bg-input); color: var(--text-primary);
+            font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 500;
+            cursor: pointer; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            margin-bottom: 20px;
+        }
+        .btn-google:hover {
+            background: var(--bg-hover);
+            box-shadow: 0 2px 12px rgba(66, 133, 244, 0.1);
+        }
+        .btn-google:disabled { opacity: 0.5; cursor: wait; }
+        .btn-google svg { flex-shrink: 0; }
+
+        /* ── DIVIDER ──────────────────────────────────────────────────────── */
+        .divider {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+        }
+        .divider-line { flex: 1; height: 1px; background: var(--border); }
+        .divider-text {
+            font-size: 11px; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
         }
 
-        /* ── FORM VIEWS ───────────────────────────────────────────────────── */
+        /* ── METHOD TABS ──────────────────────────────────────────────────── */
+        .method-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+        .method-tab {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 9px 12px; background: transparent;
+            border: 1px solid var(--border); border-radius: 8px;
+            color: var(--text-muted); font-family: 'Outfit', sans-serif;
+            font-size: 12.5px; font-weight: 500; cursor: pointer; transition: all 0.2s ease;
+        }
+        .method-tab:hover { border-color: var(--border-light); color: var(--text-secondary); }
+        .method-tab.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+        .method-tab svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+        /* ── PANELS & VIEWS ───────────────────────────────────────────────── */
+        .method-panel { display: none; }
+        .method-panel.active { display: block; animation: fadeSlide 0.25s ease; }
         .form-view { display: none; }
         .form-view.active { display: block; animation: fadeSlide 0.3s ease; }
-
         @keyframes fadeSlide {
-            from { opacity: 0; transform: translateY(8px); }
+            from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         /* ── FORM ELEMENTS ────────────────────────────────────────────────── */
-        .form-group {
-            margin-bottom: 18px;
-        }
+        .form-group { margin-bottom: 16px; }
         .form-label {
-            display: block;
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-            letter-spacing: 0.3px;
-            text-transform: uppercase;
+            display: block; font-size: 12px; font-weight: 500;
+            color: var(--text-secondary); margin-bottom: 6px;
+            letter-spacing: 0.3px; text-transform: uppercase;
         }
         .input-wrapper {
-            display: flex;
-            align-items: center;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0 14px;
-            height: 48px;
+            display: flex; align-items: center; background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 0 14px; height: 48px;
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
         .input-wrapper:focus-within {
             border-color: var(--accent);
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
-        .input-wrapper.error {
-            border-color: var(--negative);
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-        }
         .input-icon {
-            width: 18px; height: 18px;
-            stroke: var(--text-muted);
-            stroke-width: 1.8;
-            fill: none;
-            flex-shrink: 0;
-            margin-right: 10px;
+            width: 18px; height: 18px; stroke: var(--text-muted);
+            stroke-width: 1.8; fill: none; flex-shrink: 0; margin-right: 10px;
         }
         .input-wrapper:focus-within .input-icon { stroke: var(--accent); }
-
         .form-input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            outline: none;
-            color: var(--text-primary);
-            font-family: 'Outfit', sans-serif;
-            font-size: 14px;
-            height: 100%;
+            flex: 1; background: transparent; border: none; outline: none;
+            color: var(--text-primary); font-family: 'Outfit', sans-serif;
+            font-size: 14px; height: 100%;
         }
         .form-input::placeholder { color: var(--text-muted); }
-
         .phone-prefix {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-right: 6px;
-            padding-right: 8px;
-            border-right: 1px solid var(--border);
-            user-select: none;
-            flex-shrink: 0;
+            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+            color: var(--text-secondary); margin-right: 6px; padding-right: 8px;
+            border-right: 1px solid var(--border); user-select: none; flex-shrink: 0;
         }
-
         .password-toggle {
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 4px;
-            display: flex;
-            align-items: center;
+            background: none; border: none; cursor: pointer; padding: 4px;
+            display: flex; align-items: center;
         }
         .password-toggle svg {
-            width: 18px; height: 18px;
-            stroke: var(--text-muted);
-            stroke-width: 1.8;
-            fill: none;
+            width: 18px; height: 18px; stroke: var(--text-muted);
+            stroke-width: 1.8; fill: none;
         }
         .password-toggle:hover svg { stroke: var(--text-secondary); }
 
-        /* ── PHONE VERIFICATION SECTION ───────────────────────────────────── */
+        /* ── OTP ──────────────────────────────────────────────────────────── */
         .verify-section {
-            display: none;
-            margin-top: 18px;
-            padding: 18px;
+            display: none; margin-top: 16px; padding: 18px;
             background: rgba(245, 158, 11, 0.04);
-            border: 1px solid rgba(245, 158, 11, 0.12);
-            border-radius: 10px;
+            border: 1px solid rgba(245, 158, 11, 0.12); border-radius: 10px;
         }
         .verify-section.active { display: block; animation: fadeSlide 0.3s ease; }
-
-        .otp-input-group {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            margin: 14px 0;
-        }
+        .otp-input-group { display: flex; gap: 8px; justify-content: center; margin: 14px 0; }
         .otp-digit {
-            width: 44px; height: 52px;
-            text-align: center;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--text-primary);
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            outline: none;
+            width: 44px; height: 52px; text-align: center;
+            font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 600;
+            color: var(--text-primary); background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 8px; outline: none;
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        .otp-digit:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
-        }
-
-        .verify-label {
-            text-align: center;
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
-        }
+        .otp-digit:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .verify-label { text-align: center; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
         .verify-phone-display {
-            text-align: center;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            color: var(--accent);
-            font-weight: 500;
+            text-align: center; font-family: 'JetBrains Mono', monospace;
+            font-size: 14px; color: var(--accent); font-weight: 500;
         }
-
         .resend-link {
-            display: block;
-            text-align: center;
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 10px;
-            cursor: pointer;
-            transition: color 0.2s;
+            display: block; text-align: center; font-size: 12px;
+            color: var(--text-muted); margin-top: 10px; cursor: pointer; transition: color 0.2s;
         }
         .resend-link:hover { color: var(--accent); }
-        .resend-link.disabled { pointer-events: none; opacity: 0.5; }
 
         /* ── BUTTONS ──────────────────────────────────────────────────────── */
         .btn-primary {
-            width: 100%;
-            height: 48px;
-            border: none;
-            border-radius: 10px;
+            width: 100%; height: 48px; border: none; border-radius: 10px;
             background: linear-gradient(135deg, var(--accent), var(--accent-soft));
-            color: var(--bg-primary);
-            font-family: 'Outfit', sans-serif;
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 0.8px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            position: relative;
-            overflow: hidden;
+            color: var(--bg-primary); font-family: 'Outfit', sans-serif;
+            font-size: 14px; font-weight: 700; letter-spacing: 0.8px;
+            text-transform: uppercase; cursor: pointer; transition: all 0.2s ease;
         }
         .btn-primary:hover:not(:disabled) {
             transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(245, 158, 11, 0.25);
         }
         .btn-primary:active:not(:disabled) { transform: translateY(0); }
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .btn-secondary {
-            width: 100%;
-            height: 44px;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            background: transparent;
-            color: var(--text-secondary);
-            font-family: 'Outfit', sans-serif;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .btn-secondary:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-            background: var(--accent-glow);
-        }
-
-        /* ── SPINNER IN BUTTON ────────────────────────────────────────────── */
         .btn-spinner {
-            display: inline-block;
-            width: 18px; height: 18px;
-            border: 2px solid transparent;
-            border-top-color: var(--bg-primary);
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-            vertical-align: middle;
-            margin-right: 8px;
+            display: inline-block; width: 18px; height: 18px;
+            border: 2px solid transparent; border-top-color: var(--bg-primary);
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+            vertical-align: middle; margin-right: 8px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── DIVIDER ──────────────────────────────────────────────────────── */
-        .divider {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 20px 0;
-        }
-        .divider-line { flex: 1; height: 1px; background: var(--border); }
-        .divider-text { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-
-        /* ── FORGOT / LINKS ───────────────────────────────────────────────── */
-        .form-link {
-            font-size: 12px;
-            color: var(--accent);
-            cursor: pointer;
-            text-decoration: none;
-            transition: color 0.2s;
-            font-weight: 500;
-        }
-        .form-link:hover { color: var(--accent-soft); text-decoration: underline; }
-
-        .form-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 12px;
-        }
-
-        /* ── ALERT / MESSAGE ──────────────────────────────────────────────── */
+        /* ── ALERT ────────────────────────────────────────────────────────── */
         .alert {
-            display: none;
-            padding: 12px 14px;
-            border-radius: 8px;
-            font-size: 13px;
-            margin-bottom: 18px;
-            align-items: flex-start;
-            gap: 8px;
-            line-height: 1.4;
+            display: none; padding: 12px 14px; border-radius: 8px;
+            font-size: 13px; margin-bottom: 18px;
+            align-items: flex-start; gap: 8px; line-height: 1.4;
         }
         .alert.show { display: flex; animation: fadeSlide 0.3s ease; }
         .alert-icon { flex-shrink: 0; margin-top: 1px; }
         .alert.error {
             background: rgba(239, 68, 68, 0.08);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.2); color: #fca5a5;
         }
         .alert.success {
             background: rgba(34, 197, 94, 0.08);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            color: #86efac;
+            border: 1px solid rgba(34, 197, 94, 0.2); color: #86efac;
         }
         .alert.info {
             background: rgba(59, 130, 246, 0.08);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.2); color: #93c5fd;
         }
 
-        /* ── reCAPTCHA CONTAINER ──────────────────────────────────────────── */
-        #recaptcha-container {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 16px;
-            min-height: 0;
-            transition: min-height 0.3s ease;
+        /* ── LINKS & FOOTER ───────────────────────────────────────────────── */
+        .form-link {
+            font-size: 12px; color: var(--accent); cursor: pointer;
+            text-decoration: none; transition: color 0.2s; font-weight: 500;
         }
-        #recaptcha-container.active { min-height: 78px; }
+        .form-link:hover { color: var(--accent-soft); text-decoration: underline; }
+        .form-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+        .bottom-text { text-align: center; margin-top: 24px; font-size: 12px; color: var(--text-muted); }
 
-        /* ── FOOTER TEXT ──────────────────────────────────────────────────── */
-        .bottom-text {
-            text-align: center;
-            margin-top: 24px;
-            font-size: 12px;
-            color: var(--text-muted);
+        /* ── DEBUG BANNER (removable) ─────────────────────────────────────── */
+        .debug-banner {
+            display: none; padding: 8px 12px; margin-bottom: 12px;
+            background: rgba(59, 130, 246, 0.06); border: 1px solid rgba(59, 130, 246, 0.15);
+            border-radius: 8px; font-size: 11px; color: var(--info);
+            font-family: 'JetBrains Mono', monospace; word-break: break-all;
         }
-        .bottom-text a {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 500;
-        }
+        .debug-banner.show { display: block; }
 
         /* ── RESPONSIVE ───────────────────────────────────────────────────── */
         @media (max-width: 480px) {
             .auth-card { padding: 24px 20px; }
             .otp-digit { width: 38px; height: 46px; font-size: 18px; }
+            .method-tab { font-size: 11.5px; padding: 8px 8px; }
         }
     </style>
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
 </head>
 <body>
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <div class="login-wrapper">
-        <!-- ═══ LOGO ═══ -->
+
+        <!-- LOGO -->
         <div class="logo-section">
             <div class="logo-badge">DT</div>
             <div class="logo-title"><span class="brand">DONTRADING</span> <span class="pro">Pro</span></div>
         </div>
 
-        <!-- ═══ AUTH CARD ═══ -->
+        <!-- AUTH CARD -->
         <div class="auth-card">
 
-            <!-- Alert global -->
+            <!-- Debug banner — muestra errores detallados, quitar en producción -->
+            <div class="debug-banner" id="debugBanner"></div>
+
+            <!-- Alert -->
             <div class="alert" id="alertBox">
                 <span class="alert-icon" id="alertIcon"></span>
                 <span id="alertText"></span>
             </div>
 
-            <!-- View Switcher -->
+            <!-- Switcher -->
             <div class="view-switcher" id="viewSwitcher">
                 <button class="switch-btn active" data-view="login">Iniciar Sesión</button>
                 <button class="switch-btn" data-view="register">Registrarse</button>
             </div>
 
-            <!-- ═══════════════════════════════════════════════════════════════ -->
-            <!-- VIEW: LOGIN                                                    -->
-            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- VIEW: LOGIN                                                   -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
             <div class="form-view active" id="view-login">
-                <div class="form-group">
-                    <label class="form-label">Teléfono</label>
-                    <div class="input-wrapper">
-                        <svg class="input-icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
-                        <span class="phone-prefix">+1</span>
-                        <input type="tel" class="form-input" id="loginPhone" placeholder="(555) 123-4567" maxlength="14" autocomplete="tel">
+
+                <!-- Google -->
+                <button class="btn-google" id="btnGoogleLogin" onclick="handleGoogleSignIn()">
+                    <svg width="20" height="20" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    Continuar con Google
+                </button>
+
+                <div class="divider">
+                    <div class="divider-line"></div>
+                    <span class="divider-text">o ingresa con</span>
+                    <div class="divider-line"></div>
+                </div>
+
+                <!-- Method tabs -->
+                <div class="method-tabs">
+                    <button class="method-tab active" data-method="email" data-context="login" onclick="switchMethod('login','email')">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                        Email
+                    </button>
+                    <button class="method-tab" data-method="phone" data-context="login" onclick="switchMethod('login','phone')">
+                        <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                        Teléfono
+                    </button>
+                </div>
+
+                <!-- Login Email Panel -->
+                <div class="method-panel active" id="login-email-panel">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                            <input type="email" class="form-input" id="loginEmail" placeholder="tu@email.com" autocomplete="email">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contraseña</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <input type="password" class="form-input" id="loginEmailPassword" placeholder="••••••••" autocomplete="current-password">
+                            <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('loginEmailPassword',this)">
+                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="btnLoginEmail" onclick="handleLoginEmail()">INICIAR SESIÓN</button>
+                    <div class="form-footer">
+                        <span class="form-link" onclick="showView('recovery')">¿Olvidaste tu contraseña?</span>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">Contraseña</label>
-                    <div class="input-wrapper">
-                        <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                        <input type="password" class="form-input" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
-                        <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('loginPassword', this)">
-                            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </button>
+                <!-- Login Phone Panel -->
+                <div class="method-panel" id="login-phone-panel">
+                    <div class="form-group">
+                        <label class="form-label">Teléfono</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                            <span class="phone-prefix">+1</span>
+                            <input type="tel" class="form-input" id="loginPhone" placeholder="(555) 123-4567" maxlength="14" autocomplete="tel">
+                        </div>
                     </div>
-                </div>
-
-                <div id="recaptcha-container-login"></div>
-
-                <!-- OTP Verification -->
-                <div class="verify-section" id="loginVerify">
-                    <p class="verify-label">Código enviado a</p>
-                    <p class="verify-phone-display" id="loginVerifyPhone"></p>
-                    <div class="otp-input-group" id="loginOtpGroup">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                    <div class="form-group">
+                        <label class="form-label">Contraseña</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <input type="password" class="form-input" id="loginPhonePassword" placeholder="••••••••" autocomplete="current-password">
+                            <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('loginPhonePassword',this)">
+                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
                     </div>
-                    <button class="btn-primary" id="btnVerifyLogin" onclick="verifyLoginOTP()">VERIFICAR CÓDIGO</button>
-                    <span class="resend-link" id="loginResend" onclick="resendLoginCode()">Reenviar código</span>
-                </div>
 
-                <button class="btn-primary" id="btnLogin" onclick="handleLogin()">INICIAR SESIÓN</button>
+                    <!-- OTP Login -->
+                    <div class="verify-section" id="loginPhoneVerify">
+                        <p class="verify-label">Código enviado a</p>
+                        <p class="verify-phone-display" id="loginVerifyPhone"></p>
+                        <div class="otp-input-group" id="loginOtpGroup">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                        </div>
+                        <button class="btn-primary" id="btnVerifyLogin" onclick="verifyLoginOTP()">VERIFICAR CÓDIGO</button>
+                        <span class="resend-link" onclick="resendLoginCode()">Reenviar código</span>
+                    </div>
 
-                <div class="form-footer">
-                    <span class="form-link" onclick="showView('recovery')">¿Olvidaste tu contraseña?</span>
+                    <button class="btn-primary" id="btnLoginPhone" onclick="handleLoginPhone()">INICIAR SESIÓN</button>
+                    <div class="form-footer">
+                        <span class="form-link" onclick="showView('recovery')">¿Olvidaste tu contraseña?</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- ═══════════════════════════════════════════════════════════════ -->
-            <!-- VIEW: REGISTER                                                 -->
-            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- VIEW: REGISTER                                                -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
             <div class="form-view" id="view-register">
-                <div class="form-group">
-                    <label class="form-label">Nombre completo</label>
-                    <div class="input-wrapper">
-                        <svg class="input-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                        <input type="text" class="form-input" id="regName" placeholder="Tu nombre" autocomplete="name">
-                    </div>
+
+                <!-- Google -->
+                <button class="btn-google" onclick="handleGoogleSignIn()">
+                    <svg width="20" height="20" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    Registrarse con Google
+                </button>
+
+                <div class="divider">
+                    <div class="divider-line"></div>
+                    <span class="divider-text">o regístrate con</span>
+                    <div class="divider-line"></div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">Teléfono</label>
-                    <div class="input-wrapper">
-                        <svg class="input-icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
-                        <span class="phone-prefix">+1</span>
-                        <input type="tel" class="form-input" id="regPhone" placeholder="(555) 123-4567" maxlength="14" autocomplete="tel">
-                    </div>
+                <!-- Method tabs -->
+                <div class="method-tabs">
+                    <button class="method-tab active" data-method="email" data-context="register" onclick="switchMethod('register','email')">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                        Email
+                    </button>
+                    <button class="method-tab" data-method="phone" data-context="register" onclick="switchMethod('register','phone')">
+                        <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                        Teléfono
+                    </button>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">Email <span style="color:var(--text-muted);text-transform:none;font-weight:400">(opcional - recuperación)</span></label>
-                    <div class="input-wrapper">
-                        <svg class="input-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
-                        <input type="email" class="form-input" id="regEmail" placeholder="tu@email.com" autocomplete="email">
+                <!-- Register Email Panel -->
+                <div class="method-panel active" id="register-email-panel">
+                    <div class="form-group">
+                        <label class="form-label">Nombre completo</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <input type="text" class="form-input" id="regEmailName" placeholder="Tu nombre" autocomplete="name">
+                        </div>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                            <input type="email" class="form-input" id="regEmail" placeholder="tu@email.com" autocomplete="email">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contraseña</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <input type="password" class="form-input" id="regEmailPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+                            <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('regEmailPassword',this)">
+                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Teléfono <span style="color:var(--text-muted);text-transform:none;font-weight:400">(opcional)</span></label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                            <span class="phone-prefix">+1</span>
+                            <input type="tel" class="form-input" id="regEmailPhone" placeholder="(555) 123-4567" maxlength="14" autocomplete="tel">
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="btnRegisterEmail" onclick="handleRegisterEmail()">CREAR CUENTA</button>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">Contraseña</label>
-                    <div class="input-wrapper">
-                        <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                        <input type="password" class="form-input" id="regPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
-                        <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('regPassword', this)">
-                            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </button>
+                <!-- Register Phone Panel -->
+                <div class="method-panel" id="register-phone-panel">
+                    <div class="form-group">
+                        <label class="form-label">Nombre completo</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <input type="text" class="form-input" id="regPhoneName" placeholder="Tu nombre" autocomplete="name">
+                        </div>
                     </div>
-                </div>
-
-                <div id="recaptcha-container-register"></div>
-
-                <!-- OTP Verification for Register -->
-                <div class="verify-section" id="registerVerify">
-                    <p class="verify-label">Verifica tu número</p>
-                    <p class="verify-phone-display" id="regVerifyPhone"></p>
-                    <div class="otp-input-group" id="regOtpGroup">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
-                        <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                    <div class="form-group">
+                        <label class="form-label">Teléfono</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                            <span class="phone-prefix">+1</span>
+                            <input type="tel" class="form-input" id="regPhone" placeholder="(555) 123-4567" maxlength="14" autocomplete="tel">
+                        </div>
                     </div>
-                    <button class="btn-primary" id="btnVerifyRegister" onclick="verifyRegisterOTP()">VERIFICAR Y CREAR CUENTA</button>
-                    <span class="resend-link" id="regResend" onclick="resendRegisterCode()">Reenviar código</span>
-                </div>
+                    <div class="form-group">
+                        <label class="form-label">Contraseña</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <input type="password" class="form-input" id="regPhonePassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+                            <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('regPhonePassword',this)">
+                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email <span style="color:var(--text-muted);text-transform:none;font-weight:400">(opcional - recuperación)</span></label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                            <input type="email" class="form-input" id="regPhoneEmail" placeholder="tu@email.com" autocomplete="email">
+                        </div>
+                    </div>
 
-                <button class="btn-primary" id="btnRegister" onclick="handleRegister()">ENVIAR CÓDIGO DE VERIFICACIÓN</button>
+                    <!-- OTP Register -->
+                    <div class="verify-section" id="registerPhoneVerify">
+                        <p class="verify-label">Verifica tu número</p>
+                        <p class="verify-phone-display" id="regVerifyPhone"></p>
+                        <div class="otp-input-group" id="regOtpGroup">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                        </div>
+                        <button class="btn-primary" id="btnVerifyRegister" onclick="verifyRegisterOTP()">VERIFICAR Y CREAR CUENTA</button>
+                        <span class="resend-link" onclick="resendRegisterCode()">Reenviar código</span>
+                    </div>
+
+                    <button class="btn-primary" id="btnRegisterPhone" onclick="handleRegisterPhone()">ENVIAR CÓDIGO DE VERIFICACIÓN</button>
+                </div>
             </div>
 
-            <!-- ═══════════════════════════════════════════════════════════════ -->
-            <!-- VIEW: RECOVERY                                                 -->
-            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- VIEW: RECOVERY                                                -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
             <div class="form-view" id="view-recovery">
                 <div style="text-align:center; margin-bottom: 20px;">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><path d="M12 2a10 10 0 00-6.88 17.23l-.82 2.46a1 1 0 001.26 1.26l2.46-.82A10 10 0 1012 2z"/><path d="M12 8v4"/><circle cx="12" cy="16" r="0.5"/></svg>
-                    <p style="font-size: 14px; color: var(--text-secondary); margin-top: 10px;">Enviaremos instrucciones a tu email registrado</p>
+                    <p style="font-size:14px;color:var(--text-secondary);margin-top:10px;">Enviaremos instrucciones a tu email registrado</p>
                 </div>
-
                 <div class="form-group">
                     <label class="form-label">Email de recuperación</label>
                     <div class="input-wrapper">
@@ -622,41 +588,40 @@
                         <input type="email" class="form-input" id="recoveryEmail" placeholder="tu@email.com" autocomplete="email">
                     </div>
                 </div>
-
                 <button class="btn-primary" id="btnRecovery" onclick="handleRecovery()">ENVIAR ENLACE DE RECUPERACIÓN</button>
-
-                <div style="margin-top: 16px; text-align: center;">
+                <div style="margin-top:16px;text-align:center;">
                     <span class="form-link" onclick="showView('login')">← Volver al inicio de sesión</span>
                 </div>
             </div>
 
         </div>
 
-        <!-- ═══ BOTTOM TEXT ═══ -->
         <div class="bottom-text">
             DONTRADING &copy; 2026 &middot; Todos los derechos reservados
         </div>
     </div>
+
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
-    <!-- FIREBASE SDK (compat mode for simplicity with Phone Auth)             -->
+    <!-- FIREBASE SDK                                                          -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CODE LOGIC                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <script>
         // ═════════════════════════════════════════════════════════════════════════════
-// DONTRADING — AUTH MODULE v1.4
-// ✅ FIX v1.4: Redirect garantizado después de OTP verificado
-// ✅ FIX: Firestore write envuelto en try/catch independiente
-// ✅ FIX: onAuthStateChanged auto-redirect habilitado
-// ✅ SDK: Compat (firebase.auth(), firebase.firestore())
-// ✅ Providers: Phone Auth + Email/Password
-// ═════════════════════════════════════════════════════════════════════════════
+        // DONTRADING — AUTH MODULE v2.2
+        // ✅ Google: popup con fallback a redirect
+        // ✅ Email: registro + verificación obligatoria antes de entrar
+        // ✅ Phone: OTP con reCAPTCHA invisible
+        // ✅ Debug: banner visual + logs detallados
+        // ✅ Redirect: getRedirectResult() al cargar página
+        // ✅ NEW: Widget de verificación de email post-registro
+        // ═════════════════════════════════════════════════════════════════════════════
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FIREBASE CONFIG — PROYECTO: dontrading-pro (Plan Blaze)
-// ─────────────────────────────────────────────────────────────────────────────
+        // ─── FIREBASE CONFIG ─────────────────────────────────────────────────────────
         var firebaseConfig = {
             apiKey: "AIzaSyAdKShZMYYdmZ3bkmaDWsEhsLsT0YIgz-8",
             authDomain: "dontrading-pro.firebaseapp.com",
@@ -669,130 +634,196 @@
 
         firebase.initializeApp(firebaseConfig);
         var auth = firebase.auth();
-        var db = firebase.firestore();
-
-        // ═══════════════════════════════════════════════════════════════════════════
-        // LOCALIZACIÓN — para que el SMS llegue en español
-        // ═══════════════════════════════════════════════════════════════════════════
+        var db   = firebase.firestore();
         auth.languageCode = 'es';
 
-        // ═════════════════════════════════════════════════════════════════════════════
-        // STATE
-        // ═════════════════════════════════════════════════════════════════════════════
-        var confirmationResultLogin = null;
+        // ─── STATE ───────────────────────────────────────────────────────────────────
+        var confirmationResultLogin    = null;
         var confirmationResultRegister = null;
-        var recaptchaVerifierLogin = null;
-        var recaptchaVerifierRegister = null;
-        var pendingRegData = {};
+        var recaptchaVerifierLogin     = null;
+        var recaptchaVerifierRegister  = null;
+        var pendingRegPhoneData        = {};
+        var isRedirecting              = false;
+        var isWaitingEmailVerification = false;  // ← NUEVO: bloquea auto-redirect mientras espera verificación
+
+        // ─── Google Provider — configuración completa ────────────────────────────────
+        var googleProvider = new firebase.auth.GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        googleProvider.setCustomParameters({
+            prompt: 'select_account'
+        });
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // VIEW MANAGEMENT
+        // DEBUG
+        // ═════════════════════════════════════════════════════════════════════════════
+        var DEBUG_MODE = true;
+
+        function debugLog(msg, data) {
+            console.log('🔍 ' + msg, data || '');
+            if (DEBUG_MODE) {
+                var banner = document.getElementById('debugBanner');
+                banner.classList.add('show');
+                banner.textContent = msg + (data ? ' → ' + JSON.stringify(data) : '');
+            }
+        }
+
+        function debugError(msg, err) {
+            console.error('❌ ' + msg, err);
+            if (DEBUG_MODE) {
+                var banner = document.getElementById('debugBanner');
+                banner.classList.add('show');
+                banner.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                banner.style.color = '#fca5a5';
+                banner.textContent = msg + ' → code: ' + (err.code || 'N/A') + ' | msg: ' + (err.message || err);
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // getRedirectResult — Google Redirect
+        // ═════════════════════════════════════════════════════════════════════════════
+        (async function checkRedirectResult() {
+            try {
+                debugLog('Checking getRedirectResult...');
+                var result = await auth.getRedirectResult();
+
+                if (result && result.user) {
+                    debugLog('✅ Redirect result captured! UID: ' + result.user.uid);
+                    isRedirecting = true;
+                    await saveUserToFirestore(result.user, { provider: 'google' });
+                    showAlert('success', '¡Bienvenido! Redirigiendo...');
+                    redirectToDashboard(1200);
+                } else {
+                    debugLog('No redirect result (normal page load)');
+                }
+            } catch (err) {
+                debugError('getRedirectResult error', err);
+                if (err.code === 'auth/account-exists-with-different-credential') {
+                    showAlert('error', 'Ya existe una cuenta con ese email usando otro método (teléfono o email). Inicia sesión con el método original.');
+                }
+            }
+        })();
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // VIEW / TAB MANAGEMENT
         // ═════════════════════════════════════════════════════════════════════════════
         function showView(viewName) {
             document.querySelectorAll('.form-view').forEach(function(v) { v.classList.remove('active'); });
             var target = document.getElementById('view-' + viewName);
             if (target) target.classList.add('active');
-
             document.querySelectorAll('.switch-btn').forEach(function(btn) {
                 btn.classList.remove('active');
                 if (btn.getAttribute('data-view') === viewName) btn.classList.add('active');
             });
+            document.getElementById('viewSwitcher').style.display = viewName === 'recovery' ? 'none' : 'flex';
 
-            var switcher = document.getElementById('viewSwitcher');
-            switcher.style.display = viewName === 'recovery' ? 'none' : 'flex';
-
+            // ── Ocultar widget de verificación si cambia de vista ──
+            hideEmailVerificationWidget();
             hideAlert();
         }
 
         document.querySelectorAll('.switch-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                showView(btn.getAttribute('data-view'));
-            });
+            btn.addEventListener('click', function() { showView(btn.getAttribute('data-view')); });
         });
+
+        function switchMethod(context, method) {
+            document.querySelectorAll('.method-tab[data-context="' + context + '"]').forEach(function(tab) {
+                tab.classList.toggle('active', tab.getAttribute('data-method') === method);
+            });
+            var emailPanel = document.getElementById(context + '-email-panel');
+            var phonePanel = document.getElementById(context + '-phone-panel');
+            if (emailPanel) emailPanel.classList.toggle('active', method === 'email');
+            if (phonePanel) phonePanel.classList.toggle('active', method === 'phone');
+            hideAlert();
+        }
 
         // ═════════════════════════════════════════════════════════════════════════════
         // ALERTS
         // ═════════════════════════════════════════════════════════════════════════════
         function showAlert(type, message) {
             var box = document.getElementById('alertBox');
-            var icon = document.getElementById('alertIcon');
-            var text = document.getElementById('alertText');
-
             box.className = 'alert show ' + type;
-            text.textContent = message;
-
-            var icons = {
-                error: '⚠️',
-                success: '✅',
-                info: 'ℹ️'
-            };
-            icon.textContent = icons[type] || '';
+            document.getElementById('alertText').textContent = message;
+            document.getElementById('alertIcon').textContent = { error:'⚠️', success:'✅', info:'ℹ️' }[type] || '';
         }
-
-        function hideAlert() {
-            document.getElementById('alertBox').className = 'alert';
-        }
+        function hideAlert() { document.getElementById('alertBox').className = 'alert'; }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // REDIRECT HELPER — Función centralizada para redirigir al dashboard
+        // REDIRECT
         // ═════════════════════════════════════════════════════════════════════════════
         function redirectToDashboard(delay) {
             delay = delay || 1200;
-            console.log('🚀 Redirect programado a dashboard.html en ' + delay + 'ms');
-            setTimeout(function() {
-                console.log('🚀 Ejecutando redirect a dashboard.html AHORA');
-                window.location.href = 'dashboard.html';
-            }, delay);
+            isRedirecting = true;
+            console.log('🚀 Redirect en ' + delay + 'ms');
+            setTimeout(function() { window.location.href = 'dashboard.html'; }, delay);
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // FIRESTORE HELPER
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function saveUserToFirestore(user, extraData) {
+            extraData = extraData || {};
+            try {
+                var docRef = db.collection('users').doc(user.uid);
+                var doc = await docRef.get();
+
+                if (!doc.exists) {
+                    await docRef.set({
+                        name:      extraData.name || user.displayName || '',
+                        email:     extraData.email || user.email || '',
+                        phone:     extraData.phone || user.phoneNumber || '',
+                        uid:       user.uid,
+                        photoURL:  user.photoURL || '',
+                        provider:  extraData.provider || 'unknown',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        plan:      'free',
+                        verified:  false  // ← CAMBIO: empieza como false hasta verificar email
+                    });
+                    debugLog('✅ Nuevo usuario en Firestore (verified: false)');
+                } else {
+                    var update = { lastLogin: firebase.firestore.FieldValue.serverTimestamp() };
+                    var existing = doc.data();
+                    if (!existing.email && (extraData.email || user.email)) update.email = extraData.email || user.email;
+                    if (!existing.phone && (extraData.phone || user.phoneNumber)) update.phone = extraData.phone || user.phoneNumber;
+                    if (!existing.name && (extraData.name || user.displayName)) update.name = extraData.name || user.displayName;
+                    if (!existing.photoURL && user.photoURL) update.photoURL = user.photoURL;
+                    await docRef.update(update);
+                    debugLog('✅ Usuario actualizado en Firestore');
+                }
+            } catch (err) {
+                debugError('Firestore save (no bloquea redirect)', err);
+            }
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
         // UTILITIES
         // ═════════════════════════════════════════════════════════════════════════════
-        function formatPhoneForDisplay(phone) {
-            var digits = phone.replace(/\D/g, '');
-            if (digits.length === 10) {
-                return '(' + digits.substring(0,3) + ') ' + digits.substring(3,6) + '-' + digits.substring(6);
-            }
-            return phone;
-        }
-
         function cleanPhoneNumber(phone) {
             var digits = phone.replace(/\D/g, '');
             if (digits.length > 10) return '+' + digits;
             return '+1' + digits;
         }
-
         function formatPhoneInput(input) {
-            var digits = input.value.replace(/\D/g, '');
-            if (digits.length >= 7) {
-                input.value = '(' + digits.substring(0,3) + ') ' + digits.substring(3,6) + '-' + digits.substring(6,10);
-            } else if (digits.length >= 4) {
-                input.value = '(' + digits.substring(0,3) + ') ' + digits.substring(3);
-            } else if (digits.length > 0) {
-                input.value = '(' + digits;
-            }
+            var d = input.value.replace(/\D/g, '');
+            if (d.length >= 7) input.value = '(' + d.substring(0,3) + ') ' + d.substring(3,6) + '-' + d.substring(6,10);
+            else if (d.length >= 4) input.value = '(' + d.substring(0,3) + ') ' + d.substring(3);
+            else if (d.length > 0) input.value = '(' + d;
         }
-
-        ['loginPhone', 'regPhone'].forEach(function(id) {
+        ['loginPhone','regPhone','regEmailPhone'].forEach(function(id) {
             var el = document.getElementById(id);
-            if (el) {
-                el.addEventListener('input', function() { formatPhoneInput(el); });
-            }
+            if (el) el.addEventListener('input', function() { formatPhoneInput(el); });
         });
-
         function togglePassword(inputId, btn) {
             var input = document.getElementById(inputId);
-            if (input.type === 'password') {
-                input.type = 'text';
-                btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22"/></svg>';
-            } else {
-                input.type = 'password';
-                btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
-            }
+            var isPass = input.type === 'password';
+            input.type = isPass ? 'text' : 'password';
+            btn.innerHTML = isPass
+                ? '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22"/></svg>'
+                : '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
         }
-
         function setButtonLoading(btnId, loading) {
             var btn = document.getElementById(btnId);
+            if (!btn) return;
             if (loading) {
                 btn.disabled = true;
                 btn.setAttribute('data-original-text', btn.textContent);
@@ -804,387 +835,756 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // OTP INPUT HANDLING
+        // OTP
         // ═════════════════════════════════════════════════════════════════════════════
         function setupOTPInputs(groupId) {
             var inputs = document.querySelectorAll('#' + groupId + ' .otp-digit');
-            inputs.forEach(function(input, index) {
+            inputs.forEach(function(input, i) {
                 input.addEventListener('input', function(e) {
-                    var value = e.target.value.replace(/\D/g, '');
-                    e.target.value = value.charAt(0) || '';
-                    if (value && index < inputs.length - 1) {
-                        inputs[index + 1].focus();
-                    }
+                    var v = e.target.value.replace(/\D/g, '');
+                    e.target.value = v.charAt(0) || '';
+                    if (v && i < inputs.length - 1) inputs[i + 1].focus();
                 });
                 input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Backspace' && !e.target.value && index > 0) {
-                        inputs[index - 1].focus();
-                    }
+                    if (e.key === 'Backspace' && !e.target.value && i > 0) inputs[i - 1].focus();
                 });
                 input.addEventListener('paste', function(e) {
                     e.preventDefault();
-                    var pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
-                    for (var i = 0; i < inputs.length && i < pasteData.length; i++) {
-                        inputs[i].value = pasteData.charAt(i);
-                    }
-                    var focusIdx = Math.min(pasteData.length, inputs.length - 1);
-                    inputs[focusIdx].focus();
+                    var pd = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+                    for (var j = 0; j < inputs.length && j < pd.length; j++) inputs[j].value = pd.charAt(j);
+                    inputs[Math.min(pd.length, inputs.length - 1)].focus();
                 });
             });
         }
-
         function getOTPValue(groupId) {
-            var inputs = document.querySelectorAll('#' + groupId + ' .otp-digit');
-            var code = '';
-            inputs.forEach(function(inp) { code += inp.value; });
-            return code;
+            var c = ''; document.querySelectorAll('#' + groupId + ' .otp-digit').forEach(function(i) { c += i.value; }); return c;
         }
-
         function clearOTP(groupId) {
-            document.querySelectorAll('#' + groupId + ' .otp-digit').forEach(function(inp) { inp.value = ''; });
+            document.querySelectorAll('#' + groupId + ' .otp-digit').forEach(function(i) { i.value = ''; });
         }
-
         setupOTPInputs('loginOtpGroup');
         setupOTPInputs('regOtpGroup');
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // RECAPTCHA SETUP
+        // RECAPTCHA
         // ═════════════════════════════════════════════════════════════════════════════
         function setupRecaptchaInvisible(buttonId) {
-            var verifier = new firebase.auth.RecaptchaVerifier(buttonId, {
+            return new firebase.auth.RecaptchaVerifier(buttonId, {
                 'size': 'invisible',
-                'callback': function(response) {
-                    console.log('✅ reCAPTCHA resuelto invisiblemente en botón: ' + buttonId);
-                },
-                'expired-callback': function() {
-                    console.warn('⚠️ reCAPTCHA expirado, se necesita re-resolver');
-                }
+                'callback': function() { debugLog('reCAPTCHA OK: ' + buttonId); },
+                'expired-callback': function() { debugLog('reCAPTCHA expired'); }
             });
-            return verifier;
         }
-
-        function safeResetRecaptcha(verifier) {
-            try {
-                if (verifier) {
-                    verifier.clear();
-                }
-            } catch (e) {
-                console.warn('reCAPTCHA clear warning:', e.message);
-            }
+        function safeResetRecaptcha(v) {
+            try { if (v) v.clear(); } catch(e) { /* silent */ }
             return null;
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // LOGIN FLOW
+        // ██  WIDGET DE VERIFICACIÓN DE EMAIL — NUEVO
         // ═════════════════════════════════════════════════════════════════════════════
-        async function handleLogin() {
+
+        /**
+         * Inyecta el widget HTML si no existe aún en el DOM.
+         * Se llama una sola vez; las siguientes llamadas solo muestran/ocultan.
+         */
+        function ensureVerificationWidgetExists() {
+            if (document.getElementById('emailVerificationWidget')) return;
+
+            var widget = document.createElement('div');
+            widget.id = 'emailVerificationWidget';
+            widget.innerHTML = ''
+                + '<div class="evw-overlay" id="evwOverlay"></div>'
+                + '<div class="evw-card">'
+                +   '<div class="evw-icon">📧</div>'
+                +   '<h2 class="evw-title">Verifica tu correo electrónico</h2>'
+                +   '<p class="evw-text">Hemos enviado un enlace de verificación a:</p>'
+                +   '<p class="evw-email" id="evwEmail">—</p>'
+                +   '<p class="evw-text evw-sub">Revisa tu bandeja de entrada y carpeta de spam. Haz clic en el enlace del correo y luego regresa aquí.</p>'
+                +   '<button class="evw-btn evw-btn-primary" id="btnCheckVerified" onclick="checkEmailVerified()">'
+                +     '✅ Ya verifiqué mi correo'
+                +   '</button>'
+                +   '<button class="evw-btn evw-btn-secondary" id="btnResendVerification" onclick="resendVerificationEmail()">'
+                +     '🔄 Reenviar correo de verificación'
+                +   '</button>'
+                +   '<p class="evw-status" id="evwStatus"></p>'
+                +   '<a href="#" class="evw-link" onclick="cancelVerificationAndLogout(); return false;">← Volver al inicio de sesión</a>'
+                + '</div>';
+
+            // ── Estilos del widget ──
+            var style = document.createElement('style');
+            style.textContent = ''
+                + '#emailVerificationWidget { display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; }'
+                + '#emailVerificationWidget.active { display:flex; align-items:center; justify-content:center; }'
+                + '.evw-overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); }'
+                + '.evw-card { position:relative; z-index:1; background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%); border:1px solid rgba(212,175,55,0.3); border-radius:20px; padding:40px 36px; max-width:440px; width:90%; text-align:center; box-shadow:0 25px 60px rgba(0,0,0,0.5),0 0 40px rgba(212,175,55,0.1); animation:evwSlideIn 0.4s ease-out; }'
+                + '@keyframes evwSlideIn { from{opacity:0;transform:translateY(-30px)scale(0.95)} to{opacity:1;transform:translateY(0)scale(1)} }'
+                + '.evw-icon { font-size:56px; margin-bottom:16px; animation:evwBounce 2s infinite; }'
+                + '@keyframes evwBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }'
+                + '.evw-title { color:#d4af37; font-size:22px; font-weight:700; margin:0 0 12px; font-family:"Segoe UI",sans-serif; }'
+                + '.evw-text { color:rgba(255,255,255,0.8); font-size:14px; margin:0 0 6px; line-height:1.5; }'
+                + '.evw-sub { font-size:13px; color:rgba(255,255,255,0.5); margin-bottom:24px; }'
+                + '.evw-email { color:#ffd700; font-size:16px; font-weight:600; margin:8px 0 12px; word-break:break-all; }'
+                + '.evw-btn { display:block; width:100%; padding:14px; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; margin-bottom:12px; transition:all 0.2s; }'
+                + '.evw-btn:hover { transform:translateY(-2px); }'
+                + '.evw-btn:active { transform:translateY(0); }'
+                + '.evw-btn:disabled { opacity:0.6; cursor:not-allowed; transform:none; }'
+                + '.evw-btn-primary { background:linear-gradient(135deg,#d4af37,#f5d060); color:#1a1a2e; box-shadow:0 4px 15px rgba(212,175,55,0.3); }'
+                + '.evw-btn-primary:hover { box-shadow:0 6px 20px rgba(212,175,55,0.5); }'
+                + '.evw-btn-secondary { background:transparent; border:1px solid rgba(212,175,55,0.3); color:#d4af37; }'
+                + '.evw-btn-secondary:hover { background:rgba(212,175,55,0.1); }'
+                + '.evw-status { min-height:20px; font-size:13px; margin:8px 0 4px; transition:all 0.3s; }'
+                + '.evw-status.success { color:#4ade80; }'
+                + '.evw-status.error { color:#f87171; }'
+                + '.evw-status.info { color:#60a5fa; }'
+                + '.evw-link { color:rgba(255,255,255,0.5); font-size:13px; text-decoration:none; transition:color 0.2s; }'
+                + '.evw-link:hover { color:rgba(255,255,255,0.8); }'
+                + '.evw-spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(26,26,46,0.3); border-top-color:#1a1a2e; border-radius:50%; animation:evwSpin 0.6s linear infinite; vertical-align:middle; margin-right:8px; }'
+                + '@keyframes evwSpin { to{transform:rotate(360deg)} }';
+
+            document.head.appendChild(style);
+            document.body.appendChild(widget);
+        }
+
+        /**
+         * Muestra el widget de verificación con el email del usuario.
+         */
+        function showEmailVerificationWidget(email) {
+            ensureVerificationWidgetExists();
+            document.getElementById('evwEmail').textContent = email;
+            document.getElementById('evwStatus').textContent = '';
+            document.getElementById('evwStatus').className = 'evw-status';
+            document.getElementById('emailVerificationWidget').classList.add('active');
+            isWaitingEmailVerification = true;
+            console.log('📧 [VERIFICATION WIDGET] Mostrado para: ' + email);
+        }
+
+        function hideEmailVerificationWidget() {
+            var w = document.getElementById('emailVerificationWidget');
+            if (w) w.classList.remove('active');
+            isWaitingEmailVerification = false;
+        }
+
+        /**
+         * Botón "Ya verifiqué mi correo"
+         * Recarga el estado del usuario desde Firebase y verifica emailVerified.
+         */
+        async function checkEmailVerified() {
+            var btn = document.getElementById('btnCheckVerified');
+            var status = document.getElementById('evwStatus');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="evw-spinner"></span>Verificando...';
+            status.textContent = '';
+            status.className = 'evw-status';
+
+            console.log('📧 [VERIFICATION] Recargando estado del usuario...');
+
+            try {
+                var user = auth.currentUser;
+
+                if (!user) {
+                    console.error('❌ [VERIFICATION] No hay usuario autenticado');
+                    status.textContent = 'Error: sesión no encontrada. Vuelve a registrarte.';
+                    status.className = 'evw-status error';
+                    btn.disabled = false;
+                    btn.textContent = '✅ Ya verifiqué mi correo';
+                    return;
+                }
+
+                console.log('📧 [VERIFICATION] UID: ' + user.uid + ' | emailVerified antes de reload: ' + user.emailVerified);
+
+                // ── Recargar datos del usuario desde Firebase Auth ──
+                await user.reload();
+
+                // ── Re-obtener el usuario (reload() actualiza el objeto en memoria) ──
+                user = auth.currentUser;
+
+                console.log('📧 [VERIFICATION] emailVerified después de reload: ' + user.emailVerified);
+
+                if (user.emailVerified) {
+                    console.log('✅ [VERIFICATION] ¡Email verificado exitosamente!');
+                    status.textContent = '¡Correo verificado! Redirigiendo al dashboard...';
+                    status.className = 'evw-status success';
+
+                    // ── Actualizar Firestore: verified = true ──
+                    try {
+                        await db.collection('users').doc(user.uid).update({ verified: true });
+                        console.log('✅ [VERIFICATION] Firestore actualizado: verified = true');
+                    } catch (fsErr) {
+                        console.warn('⚠️ [VERIFICATION] No se pudo actualizar Firestore (no bloquea):', fsErr);
+                    }
+
+                    // ── Redirigir al dashboard ──
+                    isWaitingEmailVerification = false;
+                    redirectToDashboard(1500);
+
+                } else {
+                    console.warn('⚠️ [VERIFICATION] Email aún NO verificado');
+                    status.textContent = 'Tu correo aún no ha sido verificado. Revisa tu bandeja y haz clic en el enlace.';
+                    status.className = 'evw-status error';
+                    btn.disabled = false;
+                    btn.textContent = '✅ Ya verifiqué mi correo';
+                }
+
+            } catch (err) {
+                console.error('❌ [VERIFICATION] Error al verificar:', err);
+                status.textContent = 'Error al verificar: ' + (err.message || err);
+                status.className = 'evw-status error';
+                btn.disabled = false;
+                btn.textContent = '✅ Ya verifiqué mi correo';
+            }
+        }
+
+        /**
+         * Botón "Reenviar correo de verificación"
+         */
+        async function resendVerificationEmail() {
+            var btn = document.getElementById('btnResendVerification');
+            var status = document.getElementById('evwStatus');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="evw-spinner"></span>Enviando...';
+            status.textContent = '';
+            status.className = 'evw-status';
+
+            console.log('📧 [RESEND] Intentando reenviar correo de verificación...');
+
+            try {
+                var user = auth.currentUser;
+
+                if (!user) {
+                    console.error('❌ [RESEND] No hay usuario autenticado');
+                    status.textContent = 'Error: sesión no encontrada.';
+                    status.className = 'evw-status error';
+                    btn.disabled = false;
+                    btn.textContent = '🔄 Reenviar correo de verificación';
+                    return;
+                }
+
+                console.log('📧 [RESEND] Enviando a: ' + user.email);
+
+                await user.sendEmailVerification({
+                    url: window.location.origin + '/dashboard.html',
+                    handleCodeInApp: false
+                });
+
+                console.log('✅ [RESEND] Correo de verificación reenviado exitosamente a: ' + user.email);
+                status.textContent = '¡Correo reenviado! Revisa tu bandeja de entrada y spam.';
+                status.className = 'evw-status success';
+
+                // Cooldown de 30 segundos para evitar spam
+                var countdown = 30;
+                btn.textContent = 'Reenviar en ' + countdown + 's';
+                var interval = setInterval(function() {
+                    countdown--;
+                    if (countdown <= 0) {
+                        clearInterval(interval);
+                        btn.disabled = false;
+                        btn.textContent = '🔄 Reenviar correo de verificación';
+                    } else {
+                        btn.textContent = 'Reenviar en ' + countdown + 's';
+                    }
+                }, 1000);
+
+            } catch (err) {
+                console.error('❌ [RESEND] Error al reenviar:', err);
+
+                if (err.code === 'auth/too-many-requests') {
+                    status.textContent = 'Demasiados intentos. Espera unos minutos.';
+                } else {
+                    status.textContent = 'Error al reenviar: ' + (err.message || err);
+                }
+                status.className = 'evw-status error';
+                btn.disabled = false;
+                btn.textContent = '🔄 Reenviar correo de verificación';
+            }
+        }
+
+        /**
+         * "Volver al inicio de sesión" — cierra sesión y oculta widget
+         */
+        async function cancelVerificationAndLogout() {
+            console.log('📧 [VERIFICATION] Usuario canceló. Cerrando sesión...');
+            isWaitingEmailVerification = false;
+            hideEmailVerificationWidget();
+            try {
+                await auth.signOut();
+                console.log('✅ [VERIFICATION] Sesión cerrada.');
+            } catch (e) {
+                console.warn('⚠️ [VERIFICATION] Error al cerrar sesión:', e);
+            }
+            showView('login');
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  GOOGLE SIGN-IN — Popup con fallback a Redirect
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleGoogleSignIn() {
+            hideAlert();
+            var btn = document.getElementById('btnGoogleLogin');
+            if (btn) { btn.disabled = true; btn.textContent = 'Conectando...'; }
+
+            debugLog('Iniciando Google Sign-In (popup)...');
+
+            try {
+                var result = await auth.signInWithPopup(googleProvider);
+                var user = result.user;
+                debugLog('✅ Google popup exitoso! UID: ' + user.uid + ', email: ' + user.email);
+
+                await saveUserToFirestore(user, { provider: 'google' });
+                showAlert('success', '¡Bienvenido! Redirigiendo...');
+                redirectToDashboard(1200);
+
+            } catch (err) {
+                debugError('Google popup error', err);
+
+                if (err.code === 'auth/popup-blocked' ||
+                    err.code === 'auth/popup-closed-by-user' ||
+                    err.code === 'auth/cancelled-popup-request') {
+
+                    debugLog('Popup bloqueado/cerrado, intentando redirect...');
+                    showAlert('info', 'Redirigiendo a Google para autenticación...');
+
+                    try {
+                        await auth.signInWithRedirect(googleProvider);
+                    } catch (redirectErr) {
+                        debugError('Google redirect error', redirectErr);
+                        showAlert('error', 'Error al redirigir a Google: ' + redirectErr.message);
+                    }
+
+                } else if (err.code === 'auth/account-exists-with-different-credential') {
+                    showAlert('error', 'Ya existe una cuenta con ese email usando otro método. Intenta con email/contraseña o teléfono.');
+
+                } else if (err.code === 'auth/unauthorized-domain') {
+                    showAlert('error', 'Este dominio no está autorizado en Firebase. Agrega "' + window.location.hostname + '" en Firebase Console → Authentication → Settings → Authorized domains.');
+                    debugError('UNAUTHORIZED DOMAIN', { hostname: window.location.hostname, origin: window.location.origin });
+
+                } else if (err.code === 'auth/internal-error') {
+                    showAlert('error', 'Error interno de Firebase. Verifica que el OAuth consent screen esté configurado en Google Cloud Console.');
+
+                } else if (err.code === 'auth/operation-not-allowed') {
+                    showAlert('error', 'Google Sign-In no está habilitado. Actívalo en Firebase Console → Authentication → Sign-in method → Google.');
+
+                } else {
+                    showAlert('error', 'Error con Google: ' + translateFirebaseError(err.code));
+                }
+            }
+
+            if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continuar con Google'; }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  LOGIN: EMAIL + PASSWORD
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleLoginEmail() {
+            hideAlert();
+            var email = document.getElementById('loginEmail').value.trim();
+            var password = document.getElementById('loginEmailPassword').value;
+
+            if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
+            if (!password) { showAlert('error', 'Ingresa tu contraseña.'); return; }
+
+            setButtonLoading('btnLoginEmail', true);
+            debugLog('Login email: ' + email);
+
+            try {
+                var result = await auth.signInWithEmailAndPassword(email, password);
+                var user = result.user;
+                debugLog('✅ Login email OK. UID: ' + user.uid + ' | emailVerified: ' + user.emailVerified);
+
+                // ── NUEVO: Verificar si el email está confirmado ──
+                if (!user.emailVerified) {
+                    console.warn('⚠️ [LOGIN] Email no verificado. Mostrando widget...');
+                    isRedirecting = true; // Bloquea onAuthStateChanged
+                    await saveUserToFirestore(user, { provider: 'email' });
+                    showEmailVerificationWidget(user.email);
+                    setButtonLoading('btnLoginEmail', false);
+                    return;
+                }
+
+                await saveUserToFirestore(user, { provider: 'email' });
+                showAlert('success', '¡Bienvenido de vuelta! Redirigiendo...');
+                redirectToDashboard(1200);
+
+            } catch (err) {
+                debugError('Login email error', err);
+                if (err.code === 'auth/user-not-found') {
+                    showAlert('error', 'No hay cuenta con ese email. ¿Quieres registrarte?');
+                } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                    showAlert('error', 'Contraseña incorrecta.');
+                } else {
+                    showAlert('error', translateFirebaseError(err.code));
+                }
+            }
+            setButtonLoading('btnLoginEmail', false);
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  LOGIN: PHONE
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleLoginPhone() {
             hideAlert();
             var phone = document.getElementById('loginPhone').value.trim();
-            var password = document.getElementById('loginPassword').value;
+            var password = document.getElementById('loginPhonePassword').value;
 
             if (!phone) { showAlert('error', 'Ingresa tu número de teléfono.'); return; }
             if (phone.replace(/\D/g, '').length < 10) { showAlert('error', 'El número debe tener al menos 10 dígitos.'); return; }
             if (!password) { showAlert('error', 'Ingresa tu contraseña.'); return; }
 
-            setButtonLoading('btnLogin', true);
+            setButtonLoading('btnLoginPhone', true);
+            var fullPhone = cleanPhoneNumber(phone);
+            debugLog('Login phone: ' + fullPhone);
 
             try {
-                var fullPhone = cleanPhoneNumber(phone);
-
-                // Step 1: Query Firestore to find user by phone
-                var usersRef = db.collection('users');
-                var snapshot = await usersRef.where('phone', '==', fullPhone).limit(1).get();
+                var snapshot = await db.collection('users').where('phone', '==', fullPhone).limit(1).get();
 
                 if (snapshot.empty) {
-                    showAlert('error', 'No se encontró una cuenta con ese número. ¿Quieres registrarte?');
-                    setButtonLoading('btnLogin', false);
+                    showAlert('error', 'No se encontró cuenta con ese número. ¿Quieres registrarte?');
+                    setButtonLoading('btnLoginPhone', false);
                     return;
                 }
 
                 var userData = snapshot.docs[0].data();
+                debugLog('Usuario encontrado, email: ' + (userData.email || 'N/A'));
 
-                // Step 2: Sign in with email + password (using stored email)
                 if (userData.email) {
                     try {
-                        await auth.signInWithEmailAndPassword(userData.email, password);
-                        console.log('✅ Login exitoso con email+password');
+                        var result = await auth.signInWithEmailAndPassword(userData.email, password);
+                        debugLog('✅ Login phone→email OK');
                         showAlert('success', '¡Bienvenido de vuelta! Redirigiendo...');
                         redirectToDashboard(1200);
                     } catch (emailErr) {
+                        debugError('Login phone→email error', emailErr);
                         if (emailErr.code === 'auth/wrong-password' || emailErr.code === 'auth/invalid-credential') {
-                            showAlert('error', 'Contraseña incorrecta. Intenta de nuevo.');
+                            showAlert('error', 'Contraseña incorrecta.');
                         } else {
-                            showAlert('error', 'Error: ' + translateFirebaseError(emailErr.code));
+                            showAlert('error', translateFirebaseError(emailErr.code));
                         }
                     }
                 } else {
-                    // Fallback: Phone OTP login
                     showAlert('info', 'Verificación por SMS necesaria...');
                     await sendLoginOTP(fullPhone);
                 }
-
             } catch (err) {
-                console.error('Login error:', err);
-                showAlert('error', 'Error al iniciar sesión: ' + (err.message || err));
+                debugError('Login phone error', err);
+                showAlert('error', 'Error: ' + (err.message || err));
             }
-
-            setButtonLoading('btnLogin', false);
+            setButtonLoading('btnLoginPhone', false);
         }
 
         async function sendLoginOTP(phoneNumber) {
             try {
                 recaptchaVerifierLogin = safeResetRecaptcha(recaptchaVerifierLogin);
-                recaptchaVerifierLogin = setupRecaptchaInvisible('btnLogin');
-
+                recaptchaVerifierLogin = setupRecaptchaInvisible('btnLoginPhone');
                 confirmationResultLogin = await auth.signInWithPhoneNumber(phoneNumber, recaptchaVerifierLogin);
-
-                document.getElementById('loginVerify').classList.add('active');
-                document.getElementById('btnLogin').style.display = 'none';
+                document.getElementById('loginPhoneVerify').classList.add('active');
+                document.getElementById('btnLoginPhone').style.display = 'none';
                 document.getElementById('loginVerifyPhone').textContent = phoneNumber;
-                showAlert('success', 'Código SMS enviado correctamente.');
+                showAlert('success', 'Código SMS enviado.');
                 clearOTP('loginOtpGroup');
                 document.querySelector('#loginOtpGroup .otp-digit').focus();
-
             } catch (err) {
-                console.error('SMS Login error:', err);
-                showAlert('error', 'Error al enviar SMS: ' + translateFirebaseError(err.code));
+                debugError('SMS login error', err);
+                showAlert('error', 'Error SMS: ' + translateFirebaseError(err.code));
                 recaptchaVerifierLogin = safeResetRecaptcha(recaptchaVerifierLogin);
             }
         }
 
         async function verifyLoginOTP() {
             var code = getOTPValue('loginOtpGroup');
-            if (code.length !== 6) { showAlert('error', 'Ingresa el código completo de 6 dígitos.'); return; }
-
+            if (code.length !== 6) { showAlert('error', 'Código de 6 dígitos requerido.'); return; }
             setButtonLoading('btnVerifyLogin', true);
             try {
-                await confirmationResultLogin.confirm(code);
-                console.log('✅ Login OTP verificado correctamente');
+                var result = await confirmationResultLogin.confirm(code);
+                debugLog('✅ Login OTP OK');
+                await saveUserToFirestore(result.user, { provider: 'phone' });
                 showAlert('success', '¡Verificado! Redirigiendo...');
                 redirectToDashboard(1200);
             } catch (err) {
-                console.error('❌ Login OTP error:', err);
-                showAlert('error', 'Código incorrecto. Intenta de nuevo.');
+                showAlert('error', 'Código incorrecto.');
                 clearOTP('loginOtpGroup');
             }
             setButtonLoading('btnVerifyLogin', false);
         }
 
         function resendLoginCode() {
-            var phone = cleanPhoneNumber(document.getElementById('loginPhone').value.trim());
-            sendLoginOTP(phone);
+            sendLoginOTP(cleanPhoneNumber(document.getElementById('loginPhone').value.trim()));
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // REGISTER FLOW
+        // ██  REGISTER: EMAIL — CON VERIFICACIÓN OBLIGATORIA
         // ═════════════════════════════════════════════════════════════════════════════
-        function collectRegisterData() {
-            var nameEl = document.getElementById('regName');
-            var phoneEl = document.getElementById('regPhone');
-            var emailEl = document.getElementById('regEmail');
-            var passEl = document.getElementById('regPassword');
-
-            pendingRegData = {
-                name: nameEl ? nameEl.value.trim() : '',
-                phone: cleanPhoneNumber(phoneEl ? phoneEl.value.trim() : ''),
-                email: emailEl ? emailEl.value.trim() : '',
-                password: passEl ? passEl.value : ''
-            };
-
-            return pendingRegData;
-        }
-
-        async function handleRegister() {
+        async function handleRegisterEmail() {
             hideAlert();
-            var regData = collectRegisterData();
+            var name     = document.getElementById('regEmailName').value.trim();
+            var email    = document.getElementById('regEmail').value.trim();
+            var password = document.getElementById('regEmailPassword').value;
+            var phone    = document.getElementById('regEmailPhone').value.trim();
 
-            if (!regData.phone || regData.phone.length < 5) {
-                showAlert('error', 'Ingresa un número de teléfono válido.');
-                return;
+            if (!name) { showAlert('error', 'Ingresa tu nombre.'); return; }
+            if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
+            if (!password) { showAlert('error', 'Ingresa una contraseña.'); return; }
+            if (password.length < 6) { showAlert('error', 'Mínimo 6 caracteres.'); return; }
+
+            setButtonLoading('btnRegisterEmail', true);
+            debugLog('Register email: ' + email);
+
+            // ═══════════════════════════════════════════════════════════════════
+            // ✅ CRITICAL FIX: Bloquear auto-redirect ANTES de crear usuario
+            // Sin esto, onAuthStateChanged redirige al dashboard instantáneamente
+            // y sendEmailVerification nunca se ejecuta.
+            // ═══════════════════════════════════════════════════════════════════
+            isRedirecting = true;
+
+            try {
+                // ── Paso 1: Crear usuario ──
+                var result = await auth.createUserWithEmailAndPassword(email, password);
+                var user = result.user;
+                console.log('✅ [REGISTER] Cuenta creada. UID: ' + user.uid);
+                console.log('✅ [REGISTER] emailVerified: ' + user.emailVerified);
+
+                // ── Paso 2: Actualizar displayName ──
+                try {
+                    await user.updateProfile({ displayName: name });
+                    console.log('✅ [REGISTER] displayName actualizado: ' + name);
+                } catch(e) {
+                    console.warn('⚠️ [REGISTER] Error al actualizar displayName:', e);
+                }
+
+                // ── Paso 3: Enviar email de verificación ──
+                var emailSent = false;
+                try {
+                    console.log('📧 [REGISTER] Enviando email de verificación a: ' + email + '...');
+                    await user.sendEmailVerification({
+                        url: window.location.origin + '/dashboard.html',
+                        handleCodeInApp: false
+                    });
+                    emailSent = true;
+                    console.log('✅ [REGISTER] ¡Email de verificación enviado exitosamente a: ' + email + '!');
+                } catch (verifyErr) {
+                    console.error('❌ [REGISTER] ERROR al enviar email de verificación:', verifyErr);
+                    console.error('❌ [REGISTER] Error code:', verifyErr.code || 'N/A');
+                    console.error('❌ [REGISTER] Error message:', verifyErr.message || 'N/A');
+                    debugError('sendEmailVerification FALLÓ', verifyErr);
+                }
+
+                // ── Paso 4: Guardar en Firestore ──
+                await saveUserToFirestore(user, {
+                    name: name, email: email,
+                    phone: phone ? cleanPhoneNumber(phone) : '',
+                    provider: 'email'
+                });
+
+                // ── Paso 5: Mostrar widget de verificación (NO redirigir) ──
+                if (emailSent) {
+                    console.log('📧 [REGISTER] Mostrando widget de verificación...');
+                    showEmailVerificationWidget(email);
+                } else {
+                    // Si no se pudo enviar, intenta una vez más
+                    console.warn('⚠️ [REGISTER] Reintentando envío de email...');
+                    try {
+                        await user.sendEmailVerification({
+                            url: window.location.origin + '/dashboard.html',
+                            handleCodeInApp: false
+                        });
+                        console.log('✅ [REGISTER] Email enviado en segundo intento');
+                        showEmailVerificationWidget(email);
+                    } catch (retryErr) {
+                        console.error('❌ [REGISTER] Segundo intento también falló:', retryErr);
+                        showAlert('error', 'No pudimos enviar el correo de verificación. Intenta iniciar sesión y reenviar.');
+                        isRedirecting = false; // Desbloquear
+                    }
+                }
+
+            } catch (err) {
+                // ── Si falla la creación de cuenta, desbloquear auto-redirect ──
+                isRedirecting = false;
+                debugError('Register email error', err);
+
+                if (err.code === 'auth/email-already-in-use') {
+                    showAlert('error', 'Ya existe cuenta con ese email. ¿Quieres iniciar sesión?');
+                } else if (err.code === 'auth/weak-password') {
+                    showAlert('error', 'Contraseña muy débil. Usa al menos 6 caracteres.');
+                } else {
+                    showAlert('error', translateFirebaseError(err.code));
+                }
             }
+            setButtonLoading('btnRegisterEmail', false);
+        }
 
-            setButtonLoading('btnRegister', true);
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  REGISTER: PHONE + OTP
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleRegisterPhone() {
+            hideAlert();
+            var name     = document.getElementById('regPhoneName').value.trim();
+            var phone    = document.getElementById('regPhone').value.trim();
+            var password = document.getElementById('regPhonePassword').value;
+            var email    = document.getElementById('regPhoneEmail').value.trim();
+
+            if (!name) { showAlert('error', 'Ingresa tu nombre.'); return; }
+            if (!phone || phone.replace(/\D/g, '').length < 10) { showAlert('error', 'Teléfono válido requerido.'); return; }
+            if (!password) { showAlert('error', 'Ingresa una contraseña.'); return; }
+            if (password.length < 6) { showAlert('error', 'Mínimo 6 caracteres.'); return; }
+
+            pendingRegPhoneData = { name: name, phone: cleanPhoneNumber(phone), password: password, email: email };
+            setButtonLoading('btnRegisterPhone', true);
+            debugLog('Register phone: ' + pendingRegPhoneData.phone);
 
             try {
                 recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
-                recaptchaVerifierRegister = setupRecaptchaInvisible('btnRegister');
-
-                confirmationResultRegister = await auth.signInWithPhoneNumber(regData.phone, recaptchaVerifierRegister);
-
-                document.getElementById('registerVerify').classList.add('active');
-                showAlert('success', 'Código enviado al celular.');
-
+                recaptchaVerifierRegister = setupRecaptchaInvisible('btnRegisterPhone');
+                confirmationResultRegister = await auth.signInWithPhoneNumber(pendingRegPhoneData.phone, recaptchaVerifierRegister);
+                document.getElementById('registerPhoneVerify').classList.add('active');
+                document.getElementById('btnRegisterPhone').style.display = 'none';
+                document.getElementById('regVerifyPhone').textContent = pendingRegPhoneData.phone;
+                showAlert('success', 'Código SMS enviado.');
+                clearOTP('regOtpGroup');
+                document.querySelector('#regOtpGroup .otp-digit').focus();
             } catch (err) {
-                console.error('Register SMS error:', err);
-                showAlert('error', 'Error al enviar SMS: ' + translateFirebaseError(err.code));
+                debugError('Register phone SMS error', err);
+                showAlert('error', 'Error SMS: ' + translateFirebaseError(err.code));
                 recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
             }
-            setButtonLoading('btnRegister', false);
+            setButtonLoading('btnRegisterPhone', false);
         }
 
-        // ═════════════════════════════════════════════════════════════════════════════
-        // ✅ FIX v1.4: verifyRegisterOTP — Redirect GARANTIZADO después de OTP OK
-        // El problema original: si linkWithCredential o Firestore .set() fallaban,
-        // el catch general capturaba el error y NUNCA se ejecutaba el redirect.
-        // Solución: envolver CADA operación post-OTP en su propio try/catch.
-        // ═════════════════════════════════════════════════════════════════════════════
         async function verifyRegisterOTP() {
             var code = getOTPValue('regOtpGroup');
-            if (code.length !== 6) { showAlert('error', 'Ingresa el código completo de 6 dígitos.'); return; }
-
+            if (code.length !== 6) { showAlert('error', 'Código de 6 dígitos requerido.'); return; }
             setButtonLoading('btnVerifyRegister', true);
 
             try {
-                // ── PASO 1: Confirmar OTP (esto es lo crítico) ──
                 var result = await confirmationResultRegister.confirm(code);
                 var phoneUser = result.user;
-                console.log('✅ OTP de registro verificado. UID:', phoneUser.uid);
+                debugLog('✅ OTP registro OK. UID: ' + phoneUser.uid);
 
-                // ── PASO 2: Intentar vincular email+password (NO bloquea redirect) ──
-                if (pendingRegData.email && pendingRegData.password) {
+                var emailForLink = pendingRegPhoneData.email || pendingRegPhoneData.phone.replace('+', '') + '@dontrading.app';
+                if (pendingRegPhoneData.password) {
                     try {
-                        var emailCredential = firebase.auth.EmailAuthProvider.credential(
-                            pendingRegData.email,
-                            pendingRegData.password
-                        );
-                        await phoneUser.linkWithCredential(emailCredential);
-                        console.log('✅ Email credential linked');
-                    } catch (linkErr) {
-                        console.warn('⚠️ Could not link email (no bloquea registro):', linkErr.message);
-                    }
-                } else if (pendingRegData.password) {
-                    var syntheticEmail = pendingRegData.phone.replace('+', '') + '@dontrading.app';
-                    try {
-                        var synCredential = firebase.auth.EmailAuthProvider.credential(
-                            syntheticEmail,
-                            pendingRegData.password
-                        );
-                        await phoneUser.linkWithCredential(synCredential);
-                        pendingRegData.email = pendingRegData.email || syntheticEmail;
-                        console.log('✅ Synthetic email credential linked');
-                    } catch (linkErr) {
-                        console.warn('⚠️ Could not link synthetic email (no bloquea registro):', linkErr.message);
-                    }
+                        var cred = firebase.auth.EmailAuthProvider.credential(emailForLink, pendingRegPhoneData.password);
+                        await phoneUser.linkWithCredential(cred);
+                        debugLog('✅ Email linked');
+                    } catch (e) { debugError('Link email (no bloquea)', e); }
                 }
 
-                // ── PASO 3: Guardar datos en Firestore (NO bloquea redirect) ──
-                try {
-                    await db.collection('users').doc(phoneUser.uid).set({
-                        name: pendingRegData.name || '',
-                        phone: pendingRegData.phone || '',
-                        email: pendingRegData.email || '',
-                        uid: phoneUser.uid,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        plan: 'free',
-                        verified: true
-                    });
-                    console.log('✅ Datos de usuario guardados en Firestore');
-                } catch (firestoreErr) {
-                    console.error('⚠️ Error al guardar en Firestore (no bloquea redirect):', firestoreErr);
-                    // El usuario ya está autenticado, el redirect DEBE continuar
-                }
+                try { await phoneUser.updateProfile({ displayName: pendingRegPhoneData.name }); } catch(e) { /* silent */ }
 
-                // ── PASO 4: REDIRECT GARANTIZADO ──
-                // Si llegamos aquí, el OTP fue correcto y el usuario está autenticado
-                showAlert('success', '¡Cuenta creada exitosamente! Redirigiendo...');
+                await saveUserToFirestore(phoneUser, {
+                    name: pendingRegPhoneData.name, phone: pendingRegPhoneData.phone,
+                    email: emailForLink, provider: 'phone'
+                });
+
+                showAlert('success', '¡Cuenta creada! Redirigiendo...');
                 redirectToDashboard(1500);
 
             } catch (err) {
-                // Este catch SOLO se activa si el OTP es incorrecto/inválido
-                console.error('❌ Verify register error:', err);
+                debugError('Verify register error', err);
                 if (err.code === 'auth/invalid-verification-code') {
-                    showAlert('error', 'Código incorrecto. Intenta de nuevo.');
+                    showAlert('error', 'Código incorrecto.');
                     clearOTP('regOtpGroup');
                 } else {
-                    showAlert('error', 'Error: ' + translateFirebaseError(err.code));
+                    showAlert('error', translateFirebaseError(err.code));
                 }
             }
-
             setButtonLoading('btnVerifyRegister', false);
         }
 
-        function resendRegisterCode() {
-            handleRegister();
-        }
+        function resendRegisterCode() { handleRegisterPhone(); }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // RECOVERY FLOW
+        // ██  RECOVERY
         // ═════════════════════════════════════════════════════════════════════════════
         async function handleRecovery() {
             hideAlert();
             var email = document.getElementById('recoveryEmail').value.trim();
-
-            if (!email) { showAlert('error', 'Ingresa tu email de recuperación.'); return; }
+            if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
 
             setButtonLoading('btnRecovery', true);
-
             try {
                 await auth.sendPasswordResetEmail(email);
-                showAlert('success', '¡Enlace enviado! Revisa tu bandeja de entrada en ' + email);
+                showAlert('success', '¡Enlace enviado! Revisa tu bandeja en ' + email + ' (y carpeta de spam).');
             } catch (err) {
                 if (err.code === 'auth/user-not-found') {
-                    showAlert('error', 'No hay cuenta registrada con ese email.');
+                    showAlert('error', 'No hay cuenta con ese email.');
                 } else {
-                    showAlert('error', 'Error: ' + translateFirebaseError(err.code));
+                    showAlert('error', translateFirebaseError(err.code));
                 }
             }
-
             setButtonLoading('btnRecovery', false);
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // FIREBASE ERROR TRANSLATION
+        // ERROR TRANSLATION
         // ═════════════════════════════════════════════════════════════════════════════
         function translateFirebaseError(code) {
-            var map = {
-                'auth/invalid-phone-number': 'Número de teléfono no válido.',
-                'auth/too-many-requests': 'Demasiados intentos. Espera un momento.',
-                'auth/quota-exceeded': 'Límite de SMS excedido. Intenta más tarde.',
-                'auth/invalid-verification-code': 'Código de verificación incorrecto.',
-                'auth/code-expired': 'El código ha expirado. Solicita uno nuevo.',
-                'auth/user-not-found': 'No se encontró la cuenta.',
-                'auth/wrong-password': 'Contraseña incorrecta.',
-                'auth/invalid-credential': 'Credenciales inválidas.',
-                'auth/email-already-in-use': 'Este email ya está en uso.',
-                'auth/weak-password': 'La contraseña es muy débil.',
-                'auth/network-request-failed': 'Error de conexión. Verifica tu internet.',
-                'auth/popup-closed-by-user': 'Ventana cerrada por el usuario.',
-                'auth/captcha-check-failed': 'Error en la verificación reCAPTCHA.',
-                'auth/missing-phone-number': 'Número de teléfono requerido.',
-                'auth/credential-already-in-use': 'Esta credencial ya está asociada a otra cuenta.',
-                'auth/billing-not-enabled': 'Error de facturación en Firebase. Verifica que el plan Blaze esté activo.',
-                'auth/operation-not-allowed': 'Proveedor no habilitado. Activa Phone Auth en Firebase Console.'
+            var m = {
+                'auth/invalid-phone-number':       'Número de teléfono no válido.',
+                'auth/too-many-requests':          'Demasiados intentos. Espera un momento.',
+                'auth/quota-exceeded':             'Límite de SMS excedido.',
+                'auth/invalid-verification-code':  'Código incorrecto.',
+                'auth/code-expired':               'Código expirado. Solicita otro.',
+                'auth/user-not-found':             'Cuenta no encontrada.',
+                'auth/wrong-password':             'Contraseña incorrecta.',
+                'auth/invalid-credential':         'Credenciales inválidas.',
+                'auth/email-already-in-use':       'Email ya registrado.',
+                'auth/weak-password':              'Contraseña muy débil (mín. 6 chars).',
+                'auth/network-request-failed':     'Sin conexión. Verifica tu internet.',
+                'auth/popup-closed-by-user':       'Ventana cerrada. Intenta de nuevo.',
+                'auth/popup-blocked':              'Popup bloqueado por el navegador.',
+                'auth/captcha-check-failed':       'Error reCAPTCHA.',
+                'auth/missing-phone-number':       'Teléfono requerido.',
+                'auth/credential-already-in-use':  'Credencial ya asociada a otra cuenta.',
+                'auth/billing-not-enabled':        'Plan Blaze no activo en Firebase.',
+                'auth/operation-not-allowed':      'Proveedor no habilitado en Firebase Console.',
+                'auth/unauthorized-domain':        'Dominio no autorizado en Firebase.',
+                'auth/account-exists-with-different-credential': 'Cuenta existente con otro método.',
+                'auth/internal-error':             'Error interno. Verifica OAuth consent screen en Google Cloud.'
             };
-            return map[code] || 'Error inesperado (' + code + ')';
+            return m[code] || 'Error (' + code + ')';
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // AUTH STATE OBSERVER — ✅ FIX v1.4: Auto-redirect habilitado
+        // AUTH STATE OBSERVER — ACTUALIZADO
         // ═════════════════════════════════════════════════════════════════════════════
         auth.onAuthStateChanged(function(user) {
-            if (user) {
-                console.log('👤 User detected:', user.uid);
-                // Solo auto-redirigir si NO estamos en medio de verificación OTP
-                var isVerifyingRegister = document.getElementById('registerVerify').classList.contains('active');
-                var isVerifyingLogin = document.getElementById('loginVerify').classList.contains('active');
+            if (user && !isRedirecting && !isWaitingEmailVerification) {
+                debugLog('👤 Auth state: ' + user.uid + ' (' + (user.email || user.phoneNumber || 'google') + ') | emailVerified: ' + user.emailVerified);
 
-                if (!isVerifyingRegister && !isVerifyingLogin) {
-                    console.log('🚀 Auto-redirect: usuario ya autenticado, redirigiendo...');
+                var isVerifying = document.getElementById('registerPhoneVerify').classList.contains('active')
+                            || document.getElementById('loginPhoneVerify').classList.contains('active');
+
+                if (!isVerifying) {
+                    // ── NUEVO: Si es proveedor email y no ha verificado, mostrar widget ──
+                    var isEmailProvider = user.providerData.some(function(p) { return p.providerId === 'password'; });
+                    var isGoogleProvider = user.providerData.some(function(p) { return p.providerId === 'google.com'; });
+
+                    if (isEmailProvider && !isGoogleProvider && !user.emailVerified) {
+                        console.warn('⚠️ [AUTH OBSERVER] Email no verificado. Mostrando widget en lugar de redirigir.');
+                        isRedirecting = true;
+                        showEmailVerificationWidget(user.email);
+                        return;
+                    }
+
+                    debugLog('🚀 Auto-redirect: ya autenticado y verificado');
                     window.location.href = 'dashboard.html';
                 }
             }
         });
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // INIT LOG
+        // INIT
         // ═════════════════════════════════════════════════════════════════════════════
-        console.log('🔐 DONTRADING Login v1.4 — Firebase: dontrading-pro');
-        console.log('📱 Phone provider: Enabled');
-        console.log('🔥 Firebase project: dontrading-pro (Plan Blaze)');
-        console.log('🌐 Auth language: ' + auth.languageCode);
-        console.log('✅ Redirect fix: ACTIVO');
+        console.log('🔐 DONTRADING Login v2.2 — Email Verification Required');
+        console.log('📧 Email/Password: ✅  |  📱 Phone/SMS: ✅  |  🔵 Google: ✅');
+        console.log('🌐 Domain: ' + window.location.hostname);
+        console.log('🔗 Origin: ' + window.location.origin);
+        console.log('🔥 authDomain: ' + firebaseConfig.authDomain);
+        debugLog('Page loaded. Domain: ' + window.location.hostname);
     </script>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
 </body>
 </html>

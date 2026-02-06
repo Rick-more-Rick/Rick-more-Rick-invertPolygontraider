@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DONTRADING - Access</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <style>
+        /* ══════════════════════════════════════════════════════════════════════ */
+        /*             DONTRADING LOGIN v2.1 — Multi-Provider Auth              */
+        /*   ✅ Google popup + redirect fallback                                */
+        /*   ✅ Email verification on register                                  */
+        /*   ✅ Detailed error logging                                          */
+        /* ══════════════════════════════════════════════════════════════════════ */
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-card: #111827;
+            --bg-input: #0d1220;
+            --bg-hover: #151d2e;
+            --accent: #f59e0b;
+            --accent-soft: #d97706;
+            --accent-glow: rgba(245, 158, 11, 0.15);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: #1e293b;
+            --border-light: #334155;
+            --positive: #22c55e;
+            --negative: #ef4444;
+            --info: #3b82f6;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* ── BACKGROUND ───────────────────────────────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background:
+                radial-gradient(ellipse 600px 400px at 20% 30%, rgba(245, 158, 11, 0.04) 0%, transparent 70%),
+                radial-gradient(ellipse 500px 500px at 80% 70%, rgba(59, 130, 246, 0.03) 0%, transparent 70%),
+                radial-gradient(ellipse 400px 300px at 50% 50%, rgba(245, 158, 11, 0.02) 0%, transparent 70%);
+            animation: bgDrift 20s ease-in-out infinite alternate;
+            pointer-events: none; z-index: 0;
+        }
+        @keyframes bgDrift {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(30px, -20px) rotate(2deg); }
+        }
+        body::after {
+            content: '';
+            position: fixed; inset: 0;
+            background-image:
+                linear-gradient(rgba(245, 158, 11, 0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(245, 158, 11, 0.015) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none; z-index: 0;
+        }
+
+        /* ── CONTAINER ────────────────────────────────────────────────────── */
+        .login-wrapper {
+            position: relative; z-index: 1;
+            width: 100%; max-width: 440px; padding: 20px;
+        }
+
+        /* ── LOGO ─────────────────────────────────────────────────────────── */
+        .logo-section { text-align: center; margin-bottom: 32px; }
+        .logo-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 64px; height: 64px; border-radius: 18px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+            font-weight: 800; font-size: 22px; color: var(--bg-primary);
+            margin-bottom: 16px;
+            box-shadow: 0 8px 32px rgba(245, 158, 11, 0.2);
+            position: relative;
+        }
+        .logo-badge::after {
+            content: ''; position: absolute; inset: -3px; border-radius: 20px;
+            background: linear-gradient(135deg, var(--accent), transparent, var(--accent-soft));
+            z-index: -1; opacity: 0.3; filter: blur(8px);
+        }
+        .logo-title { font-size: 26px; font-weight: 300; letter-spacing: -0.5px; }
+        .logo-title .brand { font-weight: 800; }
+        .logo-title .pro { font-style: italic; font-weight: 300; color: var(--accent); }
+
+        /* ── CARD ──────────────────────────────────────────────────────────── */
+        .auth-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 32px;
+            position: relative; overflow: hidden;
+        }
+        .auth-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.4;
+        }
+
+        /* ── VIEW SWITCHER ────────────────────────────────────────────────── */
+        .view-switcher {
+            display: flex; background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 3px; margin-bottom: 24px;
+        }
+        .switch-btn {
+            flex: 1; padding: 10px 0; text-align: center;
+            font-size: 13px; font-weight: 600; color: var(--text-muted);
+            background: transparent; border: none; border-radius: 8px;
+            cursor: pointer; transition: all 0.25s ease; letter-spacing: 0.3px;
+        }
+        .switch-btn.active { color: var(--bg-primary); background: var(--accent); }
+
+        /* ── GOOGLE BUTTON ────────────────────────────────────────────────── */
+        .btn-google {
+            width: 100%; height: 48px;
+            border: 1px solid var(--border-light); border-radius: 10px;
+            background: var(--bg-input); color: var(--text-primary);
+            font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 500;
+            cursor: pointer; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            margin-bottom: 20px;
+        }
+        .btn-google:hover {
+            background: var(--bg-hover);
+            box-shadow: 0 2px 12px rgba(66, 133, 244, 0.1);
+        }
+        .btn-google:disabled { opacity: 0.5; cursor: wait; }
+        .btn-google svg { flex-shrink: 0; }
+
+        /* ── DIVIDER ──────────────────────────────────────────────────────── */
+        .divider {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+        }
+        .divider-line { flex: 1; height: 1px; background: var(--border); }
+        .divider-text {
+            font-size: 11px; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
+        }
+
+        /* ── METHOD TABS ──────────────────────────────────────────────────── */
+        .method-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+        .method-tab {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 9px 12px; background: transparent;
+            border: 1px solid var(--border); border-radius: 8px;
+            color: var(--text-muted); font-family: 'Outfit', sans-serif;
+            font-size: 12.5px; font-weight: 500; cursor: pointer; transition: all 0.2s ease;
+        }
+        .method-tab:hover { border-color: var(--border-light); color: var(--text-secondary); }
+        .method-tab.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+        .method-tab svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+        /* ── PANELS & VIEWS ───────────────────────────────────────────────── */
+        .method-panel { display: none; }
+        .method-panel.active { display: block; animation: fadeSlide 0.25s ease; }
+        .form-view { display: none; }
+        .form-view.active { display: block; animation: fadeSlide 0.3s ease; }
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── FORM ELEMENTS ────────────────────────────────────────────────── */
+        .form-group { margin-bottom: 16px; }
+        .form-label {
+            display: block; font-size: 12px; font-weight: 500;
+            color: var(--text-secondary); margin-bottom: 6px;
+            letter-spacing: 0.3px; text-transform: uppercase;
+        }
+        .input-wrapper {
+            display: flex; align-items: center; background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 0 14px; height: 48px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .input-wrapper:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .input-icon {
+            width: 18px; height: 18px; stroke: var(--text-muted);
+            stroke-width: 1.8; fill: none; flex-shrink: 0; margin-right: 10px;
+        }
+        .input-wrapper:focus-within .input-icon { stroke: var(--accent); }
+        .form-input {
+            flex: 1; background: transparent; border: none; outline: none;
+            color: var(--text-primary); font-family: 'Outfit', sans-serif;
+            font-size: 14px; height: 100%;
+        }
+        .form-input::placeholder { color: var(--text-muted); }
+        .phone-prefix {
+            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+            color: var(--text-secondary); margin-right: 6px; padding-right: 8px;
+            border-right: 1px solid var(--border); user-select: none; flex-shrink: 0;
+        }
+        .password-toggle {
+            background: none; border: none; cursor: pointer; padding: 4px;
+            display: flex; align-items: center;
+        }
+        .password-toggle svg {
+            width: 18px; height: 18px; stroke: var(--text-muted);
+            stroke-width: 1.8; fill: none;
+        }
+        .password-toggle:hover svg { stroke: var(--text-secondary); }
+
+        /* ── OTP ──────────────────────────────────────────────────────────── */
+        .verify-section {
+            display: none; margin-top: 16px; padding: 18px;
+            background: rgba(245, 158, 11, 0.04);
+            border: 1px solid rgba(245, 158, 11, 0.12); border-radius: 10px;
+        }
+        .verify-section.active { display: block; animation: fadeSlide 0.3s ease; }
+        .otp-input-group { display: flex; gap: 8px; justify-content: center; margin: 14px 0; }
+        .otp-digit {
+            width: 44px; height: 52px; text-align: center;
+            font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 600;
+            color: var(--text-primary); background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 8px; outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .otp-digit:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .verify-label { text-align: center; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+        .verify-phone-display {
+            text-align: center; font-family: 'JetBrains Mono', monospace;
+            font-size: 14px; color: var(--accent); font-weight: 500;
+        }
+        .resend-link {
+            display: block; text-align: center; font-size: 12px;
+            color: var(--text-muted); margin-top: 10px; cursor: pointer; transition: color 0.2s;
+        }
+        .resend-link:hover { color: var(--accent); }
+
+        /* ── BUTTONS ──────────────────────────────────────────────────────── */
+        .btn-primary {
+            width: 100%; height: 48px; border: none; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+            color: var(--bg-primary); font-family: 'Outfit', sans-serif;
+            font-size: 14px; font-weight: 700; letter-spacing: 0.8px;
+            text-transform: uppercase; cursor: pointer; transition: all 0.2s ease;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.25);
+        }
+        .btn-primary:active:not(:disabled) { transform: translateY(0); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-spinner {
+            display: inline-block; width: 18px; height: 18px;
+            border: 2px solid transparent; border-top-color: var(--bg-primary);
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+            vertical-align: middle; margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── ALERT ────────────────────────────────────────────────────────── */
+        .alert {
+            display: none; padding: 12px 14px; border-radius: 8px;
+            font-size: 13px; margin-bottom: 18px;
+            align-items: flex-start; gap: 8px; line-height: 1.4;
+        }
+        .alert.show { display: flex; animation: fadeSlide 0.3s ease; }
+        .alert-icon { flex-shrink: 0; margin-top: 1px; }
+        .alert.error {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2); color: #fca5a5;
+        }
+        .alert.success {
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.2); color: #86efac;
+        }
+        .alert.info {
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.2); color: #93c5fd;
+        }
+
+        /* ── LINKS & FOOTER ───────────────────────────────────────────────── */
+        .form-link {
+            font-size: 12px; color: var(--accent); cursor: pointer;
+            text-decoration: none; transition: color 0.2s; font-weight: 500;
+        }
+        .form-link:hover { color: var(--accent-soft); text-decoration: underline; }
+        .form-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+        .bottom-text { text-align: center; margin-top: 24px; font-size: 12px; color: var(--text-muted); }
+
+        /* ── DEBUG BANNER (removable) ─────────────────────────────────────── */
+        .debug-banner {
+            display: none; padding: 8px 12px; margin-bottom: 12px;
+            background: rgba(59, 130, 246, 0.06); border: 1px solid rgba(59, 130, 246, 0.15);
+            border-radius: 8px; font-size: 11px; color: var(--info);
+            font-family: 'JetBrains Mono', monospace; word-break: break-all;
+        }
+        .debug-banner.show { display: block; }
+
+        /* ── RESPONSIVE ───────────────────────────────────────────────────── */
+        @media (max-width: 480px) {
+            .auth-card { padding: 24px 20px; }
+            .otp-digit { width: 38px; height: 46px; font-size: 18px; }
+            .method-tab { font-size: 11.5px; padding: 8px 8px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+
+        <!-- LOGO -->
+        <div class="logo-section">
+            <div class="logo-badge">DT</div>
+            <div class="logo-title"><span class="brand">DONTRADING</span> <span class="pro">Pro</span></div>
+        </div>
+
+        <!-- AUTH CARD -->
+        <div class="auth-card">
+
+            <!-- Debug banner — muestra errores detallados, quitar en producción -->
+            <div class="debug-banner" id="debugBanner"></div>
+
+            <!-- Alert -->
+            <div class="alert" id="alertBox">
+                <span class="alert-icon" id="alertIcon"></span>
+                <span id="alertText"></span>
+            </div>
+
+            <!-- Switcher -->
+            <div class="view-switcher" id="viewSwitcher">
+                <button class="switch-btn active" data-view="login">Iniciar Sesión</button>
+                <button class="switch-btn" data-view="register">Registrarse</button>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- VIEW: LOGIN                                                   -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <div class="form-view active" id="view-login">
+
+                <!-- Google -->
+                <button class="btn-google" id="btnGoogleLogin" onclick="handleGoogleSignIn()">
+                    <svg width="20" height="20" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    Continuar con Google
+                </button>
+
+                <div class="divider">
+                    <div class="divider-line"></div>
+                    <span class="divider-text">o ingresa con</span>
+                    <div class="divider-line"></div>
+                </div>
+
+                <!-- Method tabs -->
+                <div class="method-tabs">
+                    <button class="method-tab active" data-method="email" data-context="login" onclick="switchMethod('login','email')">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                        Email
+                    </button>
+                    <button class="method-tab" data-method="phone" data-context="login" onclick="switchMethod('login','phone')">
+                        <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                        Teléfono
+                    </button>
+                </div>
+
+                <!-- Login Email Panel -->
+                <div class="method-panel active" id="login-email-panel">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                            <input type="email" class="form-input" id="loginEmail" placeholder="tu@email.com" autocomplete="email">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contraseña</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <input type="password" class="form-input" id="loginEmailPassword" placeholder="••••••••" autocomplete="current-password">
+                            <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('loginEmailPassword',this)">
+                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="btnLoginEmail" onclick="handleLoginEmail()">INICIAR SESIÓN</button>
+                    <div class="form-footer">
+                        <span class="form-link" onclick="showView('recovery')">¿Olvidaste tu contraseña?</span>
+                    </div>
+                </div>
+
+                <!-- Login Phone Panel -->
+                <div class="method-panel" id="login-phone-panel">
+                    <div class="form-group">
+                        <label class="form-label">Teléfono</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                            <span class="phone-prefix">+1</span>
+                            <input type="tel" class="form-input" id="loginPhone" placeholder="(555) 123-4567" maxlength="14" autocomplete="tel">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contraseña</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <input type="password" class="form-input" id="loginPhonePassword" placeholder="••••••••" autocomplete="current-password">
+                            <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('loginPhonePassword',this)">
+                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- OTP Login -->
+                    <div class="verify-section" id="loginPhoneVerify">
+                        <p class="verify-label">Código enviado a</p>
+                        <p class="verify-phone-display" id="loginVerifyPhone"></p>
+                        <div class="otp-input-group" id="loginOtpGroup">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                        </div>
+                        <button class="btn-primary" id="btnVerifyLogin" onclick="verifyLoginOTP()">VERIFICAR CÓDIGO</button>
+                        <span class="resend-link" onclick="resendLoginCode()">Reenviar código</span>
+                    </div>
+
+                    <button class="btn-primary" id="btnLoginPhone" onclick="handleLoginPhone()">INICIAR SESIÓN</button>
+                    <div class="form-footer">
+                        <span class="form-link" onclick="showView('recovery')">¿Olvidaste tu contraseña?</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- VIEW: REGISTER                                                -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <div class="form-view" id="view-register">
+
+                <!-- Google -->
+                <button class="btn-google" onclick="handleGoogleSignIn()">
+                    <svg width="20" height="20" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    Registrarse con Google
+                </button>
+
+                <div class="divider">
+                    <div class="divider-line"></div>
+                    <span class="divider-text">o regístrate con</span>
+                    <div class="divider-line"></div>
+                </div>
+
+                <!-- Method tabs -->
+                <div class="method-tabs">
+                    <button class="method-tab active" data-method="email" data-context="register" onclick="switchMethod('register','email')">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                        Email
+                    </button>
+                    <button class="method-tab" data-method="phone" data-context="register" onclick="switchMethod('register','phone')">
+                        <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                        Teléfono
+                    </button>
+                </div>
+
+                <!-- Register Email Panel -->
+                <div class="method-panel active" id="register-email-panel">
+                    <div class="form-group">
+                        <label class="form-label">Nombre completo</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <input type="text" class="form-input" id="regEmailName" placeholder="Tu nombre" autocomplete="name">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                            <input type="email" class="form-input" id="regEmail" placeholder="tu@email.com" autocomplete="email">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contraseña</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <input type="password" class="form-input" id="regEmailPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+                            <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('regEmailPassword',this)">
+                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Teléfono <span style="color:var(--text-muted);text-transform:none;font-weight:400">(opcional)</span></label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                            <span class="phone-prefix">+1</span>
+                            <input type="tel" class="form-input" id="regEmailPhone" placeholder="(555) 123-4567" maxlength="14" autocomplete="tel">
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="btnRegisterEmail" onclick="handleRegisterEmail()">CREAR CUENTA</button>
+                </div>
+
+                <!-- Register Phone Panel -->
+                <div class="method-panel" id="register-phone-panel">
+                    <div class="form-group">
+                        <label class="form-label">Nombre completo</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <input type="text" class="form-input" id="regPhoneName" placeholder="Tu nombre" autocomplete="name">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Teléfono</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                            <span class="phone-prefix">+1</span>
+                            <input type="tel" class="form-input" id="regPhone" placeholder="(555) 123-4567" maxlength="14" autocomplete="tel">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contraseña</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <input type="password" class="form-input" id="regPhonePassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+                            <button class="password-toggle" type="button" tabindex="-1" onclick="togglePassword('regPhonePassword',this)">
+                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email <span style="color:var(--text-muted);text-transform:none;font-weight:400">(opcional - recuperación)</span></label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                            <input type="email" class="form-input" id="regPhoneEmail" placeholder="tu@email.com" autocomplete="email">
+                        </div>
+                    </div>
+
+                    <!-- OTP Register -->
+                    <div class="verify-section" id="registerPhoneVerify">
+                        <p class="verify-label">Verifica tu número</p>
+                        <p class="verify-phone-display" id="regVerifyPhone"></p>
+                        <div class="otp-input-group" id="regOtpGroup">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric">
+                        </div>
+                        <button class="btn-primary" id="btnVerifyRegister" onclick="verifyRegisterOTP()">VERIFICAR Y CREAR CUENTA</button>
+                        <span class="resend-link" onclick="resendRegisterCode()">Reenviar código</span>
+                    </div>
+
+                    <button class="btn-primary" id="btnRegisterPhone" onclick="handleRegisterPhone()">ENVIAR CÓDIGO DE VERIFICACIÓN</button>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- VIEW: RECOVERY                                                -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <div class="form-view" id="view-recovery">
+                <div style="text-align:center; margin-bottom: 20px;">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><path d="M12 2a10 10 0 00-6.88 17.23l-.82 2.46a1 1 0 001.26 1.26l2.46-.82A10 10 0 1012 2z"/><path d="M12 8v4"/><circle cx="12" cy="16" r="0.5"/></svg>
+                    <p style="font-size:14px;color:var(--text-secondary);margin-top:10px;">Enviaremos instrucciones a tu email registrado</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email de recuperación</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+                        <input type="email" class="form-input" id="recoveryEmail" placeholder="tu@email.com" autocomplete="email">
+                    </div>
+                </div>
+                <button class="btn-primary" id="btnRecovery" onclick="handleRecovery()">ENVIAR ENLACE DE RECUPERACIÓN</button>
+                <div style="margin-top:16px;text-align:center;">
+                    <span class="form-link" onclick="showView('login')">← Volver al inicio de sesión</span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="bottom-text">
+            DONTRADING &copy; 2026 &middot; Todos los derechos reservados
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FIREBASE SDK                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+    <script>
+// ═════════════════════════════════════════════════════════════════════════════
+// DONTRADING — AUTH MODULE v2.1
+// ✅ Google: popup con fallback a redirect
+// ✅ Email: registro directo + envío de verificación
+// ✅ Phone: OTP con reCAPTCHA invisible
+// ✅ Debug: banner visual + logs detallados
+// ✅ Redirect: getRedirectResult() al cargar página
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ─── FIREBASE CONFIG ─────────────────────────────────────────────────────────
+var firebaseConfig = {
+    apiKey: "AIzaSyAdKShZMYYdmZ3bkmaDWsEhsLsT0YIgz-8",
+    authDomain: "dontrading-pro.firebaseapp.com",
+    projectId: "dontrading-pro",
+    storageBucket: "dontrading-pro.firebasestorage.app",
+    messagingSenderId: "684854856085",
+    appId: "1:684854856085:web:fd18dc2c46ff13ea81ce9c",
+    measurementId: "G-FYNX14F2VY"
+};
+
+firebase.initializeApp(firebaseConfig);
+var auth = firebase.auth();
+var db   = firebase.firestore();
+auth.languageCode = 'es';
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+var confirmationResultLogin    = null;
+var confirmationResultRegister = null;
+var recaptchaVerifierLogin     = null;
+var recaptchaVerifierRegister  = null;
+var pendingRegPhoneData        = {};
+var isRedirecting              = false;
+
+// ─── Google Provider — configuración completa ────────────────────────────────
+var googleProvider = new firebase.auth.GoogleAuthProvider();
+googleProvider.addScope('email');
+googleProvider.addScope('profile');
+googleProvider.setCustomParameters({
+    prompt: 'select_account'   // Siempre muestra selector de cuenta
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DEBUG — Banner visual para errores (quitar en producción final)
+// Cambia DEBUG_MODE a false para ocultar
+// ═════════════════════════════════════════════════════════════════════════════
+var DEBUG_MODE = true;
+
+function debugLog(msg, data) {
+    console.log('🔍 ' + msg, data || '');
+    if (DEBUG_MODE) {
+        var banner = document.getElementById('debugBanner');
+        banner.classList.add('show');
+        banner.textContent = msg + (data ? ' → ' + JSON.stringify(data) : '');
+    }
+}
+
+function debugError(msg, err) {
+    console.error('❌ ' + msg, err);
+    if (DEBUG_MODE) {
+        var banner = document.getElementById('debugBanner');
+        banner.classList.add('show');
+        banner.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        banner.style.color = '#fca5a5';
+        banner.textContent = msg + ' → code: ' + (err.code || 'N/A') + ' | msg: ' + (err.message || err);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ✅ CRITICAL FIX: getRedirectResult — captura el resultado de Google Redirect
+// Esto se ejecuta INMEDIATAMENTE al cargar la página.
+// Si el usuario fue redirigido a Google y volvió, esto captura su sesión.
+// ═════════════════════════════════════════════════════════════════════════════
+(async function checkRedirectResult() {
+    try {
+        debugLog('Checking getRedirectResult...');
+        var result = await auth.getRedirectResult();
+
+        if (result && result.user) {
+            debugLog('✅ Redirect result captured! UID: ' + result.user.uid);
+            isRedirecting = true;
+            await saveUserToFirestore(result.user, { provider: 'google' });
+            showAlert('success', '¡Bienvenido! Redirigiendo...');
+            redirectToDashboard(1200);
+        } else {
+            debugLog('No redirect result (normal page load)');
+        }
+    } catch (err) {
+        debugError('getRedirectResult error', err);
+        // Error común: account-exists-with-different-credential
+        if (err.code === 'auth/account-exists-with-different-credential') {
+            showAlert('error', 'Ya existe una cuenta con ese email usando otro método (teléfono o email). Inicia sesión con el método original.');
+        }
+    }
+})();
+
+// ═════════════════════════════════════════════════════════════════════════════
+// VIEW / TAB MANAGEMENT
+// ═════════════════════════════════════════════════════════════════════════════
+function showView(viewName) {
+    document.querySelectorAll('.form-view').forEach(function(v) { v.classList.remove('active'); });
+    var target = document.getElementById('view-' + viewName);
+    if (target) target.classList.add('active');
+    document.querySelectorAll('.switch-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-view') === viewName) btn.classList.add('active');
+    });
+    document.getElementById('viewSwitcher').style.display = viewName === 'recovery' ? 'none' : 'flex';
+    hideAlert();
+}
+
+document.querySelectorAll('.switch-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { showView(btn.getAttribute('data-view')); });
+});
+
+function switchMethod(context, method) {
+    document.querySelectorAll('.method-tab[data-context="' + context + '"]').forEach(function(tab) {
+        tab.classList.toggle('active', tab.getAttribute('data-method') === method);
+    });
+    var emailPanel = document.getElementById(context + '-email-panel');
+    var phonePanel = document.getElementById(context + '-phone-panel');
+    if (emailPanel) emailPanel.classList.toggle('active', method === 'email');
+    if (phonePanel) phonePanel.classList.toggle('active', method === 'phone');
+    hideAlert();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ALERTS
+// ═════════════════════════════════════════════════════════════════════════════
+function showAlert(type, message) {
+    var box = document.getElementById('alertBox');
+    box.className = 'alert show ' + type;
+    document.getElementById('alertText').textContent = message;
+    document.getElementById('alertIcon').textContent = { error:'⚠️', success:'✅', info:'ℹ️' }[type] || '';
+}
+function hideAlert() { document.getElementById('alertBox').className = 'alert'; }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// REDIRECT
+// ═════════════════════════════════════════════════════════════════════════════
+function redirectToDashboard(delay) {
+    delay = delay || 1200;
+    isRedirecting = true;
+    console.log('🚀 Redirect en ' + delay + 'ms');
+    setTimeout(function() { window.location.href = 'dashboard.html'; }, delay);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// FIRESTORE HELPER
+// ═════════════════════════════════════════════════════════════════════════════
+async function saveUserToFirestore(user, extraData) {
+    extraData = extraData || {};
+    try {
+        var docRef = db.collection('users').doc(user.uid);
+        var doc = await docRef.get();
+
+        if (!doc.exists) {
+            await docRef.set({
+                name:      extraData.name || user.displayName || '',
+                email:     extraData.email || user.email || '',
+                phone:     extraData.phone || user.phoneNumber || '',
+                uid:       user.uid,
+                photoURL:  user.photoURL || '',
+                provider:  extraData.provider || 'unknown',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                plan:      'free',
+                verified:  true
+            });
+            debugLog('✅ Nuevo usuario en Firestore');
+        } else {
+            var update = { lastLogin: firebase.firestore.FieldValue.serverTimestamp() };
+            var existing = doc.data();
+            if (!existing.email && (extraData.email || user.email)) update.email = extraData.email || user.email;
+            if (!existing.phone && (extraData.phone || user.phoneNumber)) update.phone = extraData.phone || user.phoneNumber;
+            if (!existing.name && (extraData.name || user.displayName)) update.name = extraData.name || user.displayName;
+            if (!existing.photoURL && user.photoURL) update.photoURL = user.photoURL;
+            await docRef.update(update);
+            debugLog('✅ Usuario actualizado en Firestore');
+        }
+    } catch (err) {
+        debugError('Firestore save (no bloquea redirect)', err);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═════════════════════════════════════════════════════════════════════════════
+function cleanPhoneNumber(phone) {
+    var digits = phone.replace(/\D/g, '');
+    if (digits.length > 10) return '+' + digits;
+    return '+1' + digits;
+}
+function formatPhoneInput(input) {
+    var d = input.value.replace(/\D/g, '');
+    if (d.length >= 7) input.value = '(' + d.substring(0,3) + ') ' + d.substring(3,6) + '-' + d.substring(6,10);
+    else if (d.length >= 4) input.value = '(' + d.substring(0,3) + ') ' + d.substring(3);
+    else if (d.length > 0) input.value = '(' + d;
+}
+['loginPhone','regPhone','regEmailPhone'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', function() { formatPhoneInput(el); });
+});
+function togglePassword(inputId, btn) {
+    var input = document.getElementById(inputId);
+    var isPass = input.type === 'password';
+    input.type = isPass ? 'text' : 'password';
+    btn.innerHTML = isPass
+        ? '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+}
+function setButtonLoading(btnId, loading) {
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (loading) {
+        btn.disabled = true;
+        btn.setAttribute('data-original-text', btn.textContent);
+        btn.innerHTML = '<span class="btn-spinner"></span>Procesando...';
+    } else {
+        btn.disabled = false;
+        btn.textContent = btn.getAttribute('data-original-text') || 'Enviar';
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// OTP
+// ═════════════════════════════════════════════════════════════════════════════
+function setupOTPInputs(groupId) {
+    var inputs = document.querySelectorAll('#' + groupId + ' .otp-digit');
+    inputs.forEach(function(input, i) {
+        input.addEventListener('input', function(e) {
+            var v = e.target.value.replace(/\D/g, '');
+            e.target.value = v.charAt(0) || '';
+            if (v && i < inputs.length - 1) inputs[i + 1].focus();
+        });
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !e.target.value && i > 0) inputs[i - 1].focus();
+        });
+        input.addEventListener('paste', function(e) {
+            e.preventDefault();
+            var pd = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+            for (var j = 0; j < inputs.length && j < pd.length; j++) inputs[j].value = pd.charAt(j);
+            inputs[Math.min(pd.length, inputs.length - 1)].focus();
+        });
+    });
+}
+function getOTPValue(groupId) {
+    var c = ''; document.querySelectorAll('#' + groupId + ' .otp-digit').forEach(function(i) { c += i.value; }); return c;
+}
+function clearOTP(groupId) {
+    document.querySelectorAll('#' + groupId + ' .otp-digit').forEach(function(i) { i.value = ''; });
+}
+setupOTPInputs('loginOtpGroup');
+setupOTPInputs('regOtpGroup');
+
+// ═════════════════════════════════════════════════════════════════════════════
+// RECAPTCHA
+// ═════════════════════════════════════════════════════════════════════════════
+function setupRecaptchaInvisible(buttonId) {
+    return new firebase.auth.RecaptchaVerifier(buttonId, {
+        'size': 'invisible',
+        'callback': function() { debugLog('reCAPTCHA OK: ' + buttonId); },
+        'expired-callback': function() { debugLog('reCAPTCHA expired'); }
+    });
+}
+function safeResetRecaptcha(v) {
+    try { if (v) v.clear(); } catch(e) { /* silent */ }
+    return null;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ██  GOOGLE SIGN-IN — Popup con fallback a Redirect
+// ═════════════════════════════════════════════════════════════════════════════
+async function handleGoogleSignIn() {
+    hideAlert();
+    var btn = document.getElementById('btnGoogleLogin');
+    if (btn) { btn.disabled = true; btn.textContent = 'Conectando...'; }
+
+    debugLog('Iniciando Google Sign-In (popup)...');
+
+    try {
+        // ── Intento 1: Popup ──
+        var result = await auth.signInWithPopup(googleProvider);
+        var user = result.user;
+        debugLog('✅ Google popup exitoso! UID: ' + user.uid + ', email: ' + user.email);
+
+        await saveUserToFirestore(user, { provider: 'google' });
+        showAlert('success', '¡Bienvenido! Redirigiendo...');
+        redirectToDashboard(1200);
+
+    } catch (err) {
+        debugError('Google popup error', err);
+
+        // ── Fallback: Redirect si popup fue bloqueado ──
+        if (err.code === 'auth/popup-blocked' ||
+            err.code === 'auth/popup-closed-by-user' ||
+            err.code === 'auth/cancelled-popup-request') {
+
+            debugLog('Popup bloqueado/cerrado, intentando redirect...');
+            showAlert('info', 'Redirigiendo a Google para autenticación...');
+
+            try {
+                await auth.signInWithRedirect(googleProvider);
+                // La página se recargará y getRedirectResult() captura el resultado
+            } catch (redirectErr) {
+                debugError('Google redirect error', redirectErr);
+                showAlert('error', 'Error al redirigir a Google: ' + redirectErr.message);
+            }
+
+        } else if (err.code === 'auth/account-exists-with-different-credential') {
+            showAlert('error', 'Ya existe una cuenta con ese email usando otro método. Intenta con email/contraseña o teléfono.');
+
+        } else if (err.code === 'auth/unauthorized-domain') {
+            showAlert('error', 'Este dominio no está autorizado en Firebase. Agrega "' + window.location.hostname + '" en Firebase Console → Authentication → Settings → Authorized domains.');
+            debugError('UNAUTHORIZED DOMAIN', { hostname: window.location.hostname, origin: window.location.origin });
+
+        } else if (err.code === 'auth/internal-error') {
+            showAlert('error', 'Error interno de Firebase. Verifica que el OAuth consent screen esté configurado en Google Cloud Console.');
+
+        } else if (err.code === 'auth/operation-not-allowed') {
+            showAlert('error', 'Google Sign-In no está habilitado. Actívalo en Firebase Console → Authentication → Sign-in method → Google.');
+
+        } else {
+            showAlert('error', 'Error con Google: ' + translateFirebaseError(err.code));
+        }
+    }
+
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continuar con Google'; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ██  LOGIN: EMAIL + PASSWORD
+// ═════════════════════════════════════════════════════════════════════════════
+async function handleLoginEmail() {
+    hideAlert();
+    var email = document.getElementById('loginEmail').value.trim();
+    var password = document.getElementById('loginEmailPassword').value;
+
+    if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
+    if (!password) { showAlert('error', 'Ingresa tu contraseña.'); return; }
+
+    setButtonLoading('btnLoginEmail', true);
+    debugLog('Login email: ' + email);
+
+    try {
+        var result = await auth.signInWithEmailAndPassword(email, password);
+        debugLog('✅ Login email OK. UID: ' + result.user.uid);
+        await saveUserToFirestore(result.user, { provider: 'email' });
+        showAlert('success', '¡Bienvenido de vuelta! Redirigiendo...');
+        redirectToDashboard(1200);
+    } catch (err) {
+        debugError('Login email error', err);
+        if (err.code === 'auth/user-not-found') {
+            showAlert('error', 'No hay cuenta con ese email. ¿Quieres registrarte?');
+        } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+            showAlert('error', 'Contraseña incorrecta.');
+        } else {
+            showAlert('error', translateFirebaseError(err.code));
+        }
+    }
+    setButtonLoading('btnLoginEmail', false);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ██  LOGIN: PHONE (Firestore lookup → email+pass, fallback OTP)
+// ═════════════════════════════════════════════════════════════════════════════
+async function handleLoginPhone() {
+    hideAlert();
+    var phone = document.getElementById('loginPhone').value.trim();
+    var password = document.getElementById('loginPhonePassword').value;
+
+    if (!phone) { showAlert('error', 'Ingresa tu número de teléfono.'); return; }
+    if (phone.replace(/\D/g, '').length < 10) { showAlert('error', 'El número debe tener al menos 10 dígitos.'); return; }
+    if (!password) { showAlert('error', 'Ingresa tu contraseña.'); return; }
+
+    setButtonLoading('btnLoginPhone', true);
+    var fullPhone = cleanPhoneNumber(phone);
+    debugLog('Login phone: ' + fullPhone);
+
+    try {
+        var snapshot = await db.collection('users').where('phone', '==', fullPhone).limit(1).get();
+
+        if (snapshot.empty) {
+            showAlert('error', 'No se encontró cuenta con ese número. ¿Quieres registrarte?');
+            setButtonLoading('btnLoginPhone', false);
+            return;
+        }
+
+        var userData = snapshot.docs[0].data();
+        debugLog('Usuario encontrado, email: ' + (userData.email || 'N/A'));
+
+        if (userData.email) {
+            try {
+                var result = await auth.signInWithEmailAndPassword(userData.email, password);
+                debugLog('✅ Login phone→email OK');
+                showAlert('success', '¡Bienvenido de vuelta! Redirigiendo...');
+                redirectToDashboard(1200);
+            } catch (emailErr) {
+                debugError('Login phone→email error', emailErr);
+                if (emailErr.code === 'auth/wrong-password' || emailErr.code === 'auth/invalid-credential') {
+                    showAlert('error', 'Contraseña incorrecta.');
+                } else {
+                    showAlert('error', translateFirebaseError(emailErr.code));
+                }
+            }
+        } else {
+            showAlert('info', 'Verificación por SMS necesaria...');
+            await sendLoginOTP(fullPhone);
+        }
+    } catch (err) {
+        debugError('Login phone error', err);
+        showAlert('error', 'Error: ' + (err.message || err));
+    }
+    setButtonLoading('btnLoginPhone', false);
+}
+
+async function sendLoginOTP(phoneNumber) {
+    try {
+        recaptchaVerifierLogin = safeResetRecaptcha(recaptchaVerifierLogin);
+        recaptchaVerifierLogin = setupRecaptchaInvisible('btnLoginPhone');
+        confirmationResultLogin = await auth.signInWithPhoneNumber(phoneNumber, recaptchaVerifierLogin);
+        document.getElementById('loginPhoneVerify').classList.add('active');
+        document.getElementById('btnLoginPhone').style.display = 'none';
+        document.getElementById('loginVerifyPhone').textContent = phoneNumber;
+        showAlert('success', 'Código SMS enviado.');
+        clearOTP('loginOtpGroup');
+        document.querySelector('#loginOtpGroup .otp-digit').focus();
+    } catch (err) {
+        debugError('SMS login error', err);
+        showAlert('error', 'Error SMS: ' + translateFirebaseError(err.code));
+        recaptchaVerifierLogin = safeResetRecaptcha(recaptchaVerifierLogin);
+    }
+}
+
+async function verifyLoginOTP() {
+    var code = getOTPValue('loginOtpGroup');
+    if (code.length !== 6) { showAlert('error', 'Código de 6 dígitos requerido.'); return; }
+    setButtonLoading('btnVerifyLogin', true);
+    try {
+        var result = await confirmationResultLogin.confirm(code);
+        debugLog('✅ Login OTP OK');
+        await saveUserToFirestore(result.user, { provider: 'phone' });
+        showAlert('success', '¡Verificado! Redirigiendo...');
+        redirectToDashboard(1200);
+    } catch (err) {
+        showAlert('error', 'Código incorrecto.');
+        clearOTP('loginOtpGroup');
+    }
+    setButtonLoading('btnVerifyLogin', false);
+}
+
+function resendLoginCode() {
+    sendLoginOTP(cleanPhoneNumber(document.getElementById('loginPhone').value.trim()));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ██  REGISTER: EMAIL (directo, sin SMS) + Email Verification
+// ═════════════════════════════════════════════════════════════════════════════
+async function handleRegisterEmail() {
+    hideAlert();
+    var name     = document.getElementById('regEmailName').value.trim();
+    var email    = document.getElementById('regEmail').value.trim();
+    var password = document.getElementById('regEmailPassword').value;
+    var phone    = document.getElementById('regEmailPhone').value.trim();
+
+    if (!name) { showAlert('error', 'Ingresa tu nombre.'); return; }
+    if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
+    if (!password) { showAlert('error', 'Ingresa una contraseña.'); return; }
+    if (password.length < 6) { showAlert('error', 'Mínimo 6 caracteres.'); return; }
+
+    setButtonLoading('btnRegisterEmail', true);
+    debugLog('Register email: ' + email);
+
+    try {
+        var result = await auth.createUserWithEmailAndPassword(email, password);
+        var user = result.user;
+        debugLog('✅ Cuenta email creada. UID: ' + user.uid);
+
+        // Update profile name
+        try { await user.updateProfile({ displayName: name }); } catch(e) { /* silent */ }
+
+        // ✅ FIX: Enviar email de verificación
+        try {
+            await user.sendEmailVerification({
+                url: window.location.origin + '/dashboard.html',  // URL de retorno
+                handleCodeInApp: false
+            });
+            debugLog('✅ Email de verificación enviado a: ' + email);
+        } catch (verifyErr) {
+            debugError('sendEmailVerification error (no bloquea)', verifyErr);
+        }
+
+        // Save to Firestore
+        await saveUserToFirestore(user, {
+            name: name, email: email,
+            phone: phone ? cleanPhoneNumber(phone) : '',
+            provider: 'email'
+        });
+
+        showAlert('success', '¡Cuenta creada! Revisa tu email para verificar. Redirigiendo...');
+        redirectToDashboard(2000);
+
+    } catch (err) {
+        debugError('Register email error', err);
+        if (err.code === 'auth/email-already-in-use') {
+            showAlert('error', 'Ya existe cuenta con ese email. ¿Quieres iniciar sesión?');
+        } else if (err.code === 'auth/weak-password') {
+            showAlert('error', 'Contraseña muy débil. Usa al menos 6 caracteres.');
+        } else {
+            showAlert('error', translateFirebaseError(err.code));
+        }
+    }
+    setButtonLoading('btnRegisterEmail', false);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ██  REGISTER: PHONE + OTP
+// ═════════════════════════════════════════════════════════════════════════════
+async function handleRegisterPhone() {
+    hideAlert();
+    var name     = document.getElementById('regPhoneName').value.trim();
+    var phone    = document.getElementById('regPhone').value.trim();
+    var password = document.getElementById('regPhonePassword').value;
+    var email    = document.getElementById('regPhoneEmail').value.trim();
+
+    if (!name) { showAlert('error', 'Ingresa tu nombre.'); return; }
+    if (!phone || phone.replace(/\D/g, '').length < 10) { showAlert('error', 'Teléfono válido requerido.'); return; }
+    if (!password) { showAlert('error', 'Ingresa una contraseña.'); return; }
+    if (password.length < 6) { showAlert('error', 'Mínimo 6 caracteres.'); return; }
+
+    pendingRegPhoneData = { name: name, phone: cleanPhoneNumber(phone), password: password, email: email };
+    setButtonLoading('btnRegisterPhone', true);
+    debugLog('Register phone: ' + pendingRegPhoneData.phone);
+
+    try {
+        recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
+        recaptchaVerifierRegister = setupRecaptchaInvisible('btnRegisterPhone');
+        confirmationResultRegister = await auth.signInWithPhoneNumber(pendingRegPhoneData.phone, recaptchaVerifierRegister);
+        document.getElementById('registerPhoneVerify').classList.add('active');
+        document.getElementById('btnRegisterPhone').style.display = 'none';
+        document.getElementById('regVerifyPhone').textContent = pendingRegPhoneData.phone;
+        showAlert('success', 'Código SMS enviado.');
+        clearOTP('regOtpGroup');
+        document.querySelector('#regOtpGroup .otp-digit').focus();
+    } catch (err) {
+        debugError('Register phone SMS error', err);
+        showAlert('error', 'Error SMS: ' + translateFirebaseError(err.code));
+        recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
+    }
+    setButtonLoading('btnRegisterPhone', false);
+}
+
+async function verifyRegisterOTP() {
+    var code = getOTPValue('regOtpGroup');
+    if (code.length !== 6) { showAlert('error', 'Código de 6 dígitos requerido.'); return; }
+    setButtonLoading('btnVerifyRegister', true);
+
+    try {
+        var result = await confirmationResultRegister.confirm(code);
+        var phoneUser = result.user;
+        debugLog('✅ OTP registro OK. UID: ' + phoneUser.uid);
+
+        // Link email+password
+        var emailForLink = pendingRegPhoneData.email || pendingRegPhoneData.phone.replace('+', '') + '@dontrading.app';
+        if (pendingRegPhoneData.password) {
+            try {
+                var cred = firebase.auth.EmailAuthProvider.credential(emailForLink, pendingRegPhoneData.password);
+                await phoneUser.linkWithCredential(cred);
+                debugLog('✅ Email linked');
+            } catch (e) { debugError('Link email (no bloquea)', e); }
+        }
+
+        try { await phoneUser.updateProfile({ displayName: pendingRegPhoneData.name }); } catch(e) { /* silent */ }
+
+        await saveUserToFirestore(phoneUser, {
+            name: pendingRegPhoneData.name, phone: pendingRegPhoneData.phone,
+            email: emailForLink, provider: 'phone'
+        });
+
+        showAlert('success', '¡Cuenta creada! Redirigiendo...');
+        redirectToDashboard(1500);
+
+    } catch (err) {
+        debugError('Verify register error', err);
+        if (err.code === 'auth/invalid-verification-code') {
+            showAlert('error', 'Código incorrecto.');
+            clearOTP('regOtpGroup');
+        } else {
+            showAlert('error', translateFirebaseError(err.code));
+        }
+    }
+    setButtonLoading('btnVerifyRegister', false);
+}
+
+function resendRegisterCode() { handleRegisterPhone(); }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ██  RECOVERY
+// ═════════════════════════════════════════════════════════════════════════════
+async function handleRecovery() {
+    hideAlert();
+    var email = document.getElementById('recoveryEmail').value.trim();
+    if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
+
+    setButtonLoading('btnRecovery', true);
+    try {
+        await auth.sendPasswordResetEmail(email);
+        showAlert('success', '¡Enlace enviado! Revisa tu bandeja en ' + email + ' (y carpeta de spam).');
+    } catch (err) {
+        if (err.code === 'auth/user-not-found') {
+            showAlert('error', 'No hay cuenta con ese email.');
+        } else {
+            showAlert('error', translateFirebaseError(err.code));
+        }
+    }
+    setButtonLoading('btnRecovery', false);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ERROR TRANSLATION
+// ═════════════════════════════════════════════════════════════════════════════
+function translateFirebaseError(code) {
+    var m = {
+        'auth/invalid-phone-number':       'Número de teléfono no válido.',
+        'auth/too-many-requests':          'Demasiados intentos. Espera un momento.',
+        'auth/quota-exceeded':             'Límite de SMS excedido.',
+        'auth/invalid-verification-code':  'Código incorrecto.',
+        'auth/code-expired':               'Código expirado. Solicita otro.',
+        'auth/user-not-found':             'Cuenta no encontrada.',
+        'auth/wrong-password':             'Contraseña incorrecta.',
+        'auth/invalid-credential':         'Credenciales inválidas.',
+        'auth/email-already-in-use':       'Email ya registrado.',
+        'auth/weak-password':              'Contraseña muy débil (mín. 6 chars).',
+        'auth/network-request-failed':     'Sin conexión. Verifica tu internet.',
+        'auth/popup-closed-by-user':       'Ventana cerrada. Intenta de nuevo.',
+        'auth/popup-blocked':              'Popup bloqueado por el navegador.',
+        'auth/captcha-check-failed':       'Error reCAPTCHA.',
+        'auth/missing-phone-number':       'Teléfono requerido.',
+        'auth/credential-already-in-use':  'Credencial ya asociada a otra cuenta.',
+        'auth/billing-not-enabled':        'Plan Blaze no activo en Firebase.',
+        'auth/operation-not-allowed':      'Proveedor no habilitado en Firebase Console.',
+        'auth/unauthorized-domain':        'Dominio no autorizado en Firebase.',
+        'auth/account-exists-with-different-credential': 'Cuenta existente con otro método.',
+        'auth/internal-error':             'Error interno. Verifica OAuth consent screen en Google Cloud.'
+    };
+    return m[code] || 'Error (' + code + ')';
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// AUTH STATE OBSERVER
+// ═════════════════════════════════════════════════════════════════════════════
+auth.onAuthStateChanged(function(user) {
+    if (user && !isRedirecting) {
+        debugLog('👤 Auth state: ' + user.uid + ' (' + (user.email || user.phoneNumber || 'google') + ')');
+        var isVerifying = document.getElementById('registerPhoneVerify').classList.contains('active')
+                       || document.getElementById('loginPhoneVerify').classList.contains('active');
+        if (!isVerifying) {
+            debugLog('🚀 Auto-redirect: ya autenticado');
+            window.location.href = 'dashboard.html';
+        }
+    }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// INIT
+// ═════════════════════════════════════════════════════════════════════════════
+console.log('🔐 DONTRADING Login v2.1');
+console.log('📧 Email/Password: ✅  |  📱 Phone/SMS: ✅  |  🔵 Google: ✅');
+console.log('🌐 Domain: ' + window.location.hostname);
+console.log('🔗 Origin: ' + window.location.origin);
+console.log('🔥 authDomain: ' + firebaseConfig.authDomain);
+debugLog('Page loaded. Domain: ' + window.location.hostname);
+    </script>
+</body>
+</html>

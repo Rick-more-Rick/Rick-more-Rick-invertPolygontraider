@@ -783,10 +783,15 @@
             <button class="reel-selector-cancel" onclick="closeReelSelector()">Cancelar</button>
         </div>
     </div>
-
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
     <script>
         // ═════════════════════════════════════════════════════════════════════════
-        // MÓDULO GUIDEBOOK - JAVASCRIPT OPTIMIZADO + NAVBAR DE MERCADOS
+        // MÓDULO GUIDEBOOK v2.0 - JAVASCRIPT CORREGIDO
+        // ═════════════════════════════════════════════════════════════════════════
+        // ✅ FIX: assignToReel ahora actualiza correctamente el reel principal
+        // ✅ FIX: updateReelIfMatches trackea ticker del reel principal
+        // ✅ FIX: Detección de horario de mercado + modo After Hours
+        // ✅ FIX: WebSocket robusto con fallback a REST API
         // ═════════════════════════════════════════════════════════════════════════
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -797,11 +802,43 @@
         var cryptoSocket = null;
         var forexSocket = null;
         var reconnectAttempts = { stocks: 0, crypto: 0, forex: 0 };
+        var MAX_RECONNECT = 5;
         var lastMessageTime = Date.now();
         var tradeCount = { stocks: 0, crypto: 0, forex: 0 };
 
         // ─────────────────────────────────────────────────────────────────────────
-        // CATÁLOGO DE ACTIVOS POR MERCADO (Top 10 cada uno)
+        // ✅ NUEVO: ESTADO DE MERCADO (horarios)
+        // ─────────────────────────────────────────────────────────────────────────
+        var marketStatus = {
+            stocks: 'closed',     // 'open', 'pre-market', 'after-hours', 'closed'
+            crypto: 'open',       // Crypto siempre abierto 24/7
+            forex: 'closed',      // Forex: Dom 5PM ET - Vie 5PM ET
+            lastCheck: 0,
+            checkInterval: 60000  // Revisar cada 60 segundos
+        };
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // ✅ NUEVO: MAPA DE TICKERS POR REEL (tracking central)
+        // Resuelve el bug donde el reel principal no se actualizaba porque
+        // no tenía data-symbol en el DOM. Ahora usamos este mapa en JS.
+        // ─────────────────────────────────────────────────────────────────────────
+        var reelTickerMap = {
+            'reel-1': 'AAPL',
+            'reel-2': 'NVDA',
+            'reel-3': 'TSLA',
+            'reel-4': 'MSFT'
+        };
+
+        // Tipo de mercado por reel (para saber si es stock, crypto, forex)
+        var reelMarketType = {
+            'reel-1': 'stocks',
+            'reel-2': 'stocks',
+            'reel-3': 'stocks',
+            'reel-4': 'stocks'
+        };
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // CATÁLOGO DE ACTIVOS POR MERCADO
         // ─────────────────────────────────────────────────────────────────────────
         var MARKET_ASSETS = {
             dow: {
@@ -889,12 +926,12 @@
         // Estado del navbar
         var navbarState = {
             activeDropdown: null,
-            pendingAsset: null,    // activo seleccionado pendiente de asignar a un reel
+            pendingAsset: null,
             wsStatus: { stocks: 'disconnected', crypto: 'disconnected', forex: 'disconnected' }
         };
 
         // ─────────────────────────────────────────────────────────────────────────
-        // CONFIGURACIÓN DE REELS (original)
+        // CONFIGURACIÓN DE REELS
         // ─────────────────────────────────────────────────────────────────────────
         var REELS_CONFIG = [
             { id: 'reel-1', symbol: 'AAPL', name: 'Apple Inc.', color: '#3b82f6', price: 178.52, change: 2.34, isPositive: true },
@@ -908,16 +945,26 @@
             smallReels: ['reel-1', 'reel-2', 'reel-3'],
             isConnected: true,
             simulationInterval: null,
+            afterHoursSimInterval: null,
             priceHistory: {},
-            chatMessages: {}
+            chatMessages: {},
+            useRealData: false  // ✅ Flag: true cuando hay datos reales del WS
         };
 
         // ─────────────────────────────────────────────────────────────────────────
-        // UTILIDADES (original)
+        // UTILIDADES
         // ─────────────────────────────────────────────────────────────────────────
         function findReelById(id) {
             for (var i = 0; i < REELS_CONFIG.length; i++) {
                 if (REELS_CONFIG[i].id === id) return REELS_CONFIG[i];
+            }
+            return null;
+        }
+
+        function findReelByTicker(ticker) {
+            for (var i = 0; i < REELS_CONFIG.length; i++) {
+                var reelId = REELS_CONFIG[i].id;
+                if (reelTickerMap[reelId] === ticker) return REELS_CONFIG[i];
             }
             return null;
         }
@@ -928,35 +975,145 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // ✅ NUEVO: NAVBAR DROPDOWN SYSTEM
+        // ✅ NUEVO: DETECCIÓN DE HORARIO DE MERCADO
+        // ═════════════════════════════════════════════════════════════════════════
+
+        function checkMarketHours() {
+            var now = new Date();
+            var utcHour = now.getUTCHours();
+            var utcMinute = now.getUTCMinutes();
+            var utcDay = now.getUTCDay(); // 0=Dom, 6=Sab
+
+            // ── Convertir a Eastern Time (UTC-5, o UTC-4 en DST) ──
+            // Simplificación: usamos UTC-5 (EST estándar)
+            var etHour = utcHour - 5;
+            if (etHour < 0) etHour += 24;
+            var etMinutes = etHour * 60 + utcMinute;
+
+            // ── STOCKS: NYSE/NASDAQ ──
+            // Pre-market:   4:00 AM - 9:30 AM ET
+            // Regular:      9:30 AM - 4:00 PM ET (570 - 960 minutos)
+            // After-hours:  4:00 PM - 8:00 PM ET
+            // Cerrado:      8:00 PM - 4:00 AM ET + fines de semana
+
+            var oldStockStatus = marketStatus.stocks;
+
+            if (utcDay === 0 || utcDay === 6) {
+                // Fin de semana
+                marketStatus.stocks = 'closed';
+            } else if (etMinutes >= 240 && etMinutes < 570) {
+                // 4:00 AM - 9:30 AM ET
+                marketStatus.stocks = 'pre-market';
+            } else if (etMinutes >= 570 && etMinutes < 960) {
+                // 9:30 AM - 4:00 PM ET
+                marketStatus.stocks = 'open';
+            } else if (etMinutes >= 960 && etMinutes < 1200) {
+                // 4:00 PM - 8:00 PM ET
+                marketStatus.stocks = 'after-hours';
+            } else {
+                marketStatus.stocks = 'closed';
+            }
+
+            // ── CRYPTO: Siempre abierto ──
+            marketStatus.crypto = 'open';
+
+            // ── FOREX: Dom 5PM ET - Vie 5PM ET ──
+            // Cerrado: Vie 5PM ET → Dom 5PM ET
+            var forexClosed = false;
+            if (utcDay === 6) {
+                forexClosed = true; // Sábado completo
+            } else if (utcDay === 5 && etMinutes >= 1020) {
+                forexClosed = true; // Viernes después de 5PM ET
+            } else if (utcDay === 0 && etMinutes < 1020) {
+                forexClosed = true; // Domingo antes de 5PM ET
+            }
+            marketStatus.forex = forexClosed ? 'closed' : 'open';
+
+            marketStatus.lastCheck = Date.now();
+
+            // Log cambio de estado
+            if (oldStockStatus !== marketStatus.stocks) {
+                console.log('[Market] Estado de bolsa cambió: ' + oldStockStatus + ' → ' + marketStatus.stocks);
+                updateMarketStatusUI();
+            }
+
+            return marketStatus;
+        }
+
+        function getMarketStatusLabel(type) {
+            var status = marketStatus[type];
+            var labels = {
+                'open': '🟢 MERCADO ABIERTO',
+                'pre-market': '🟡 PRE-MARKET',
+                'after-hours': '🟠 AFTER HOURS',
+                'closed': '🔴 MERCADO CERRADO'
+            };
+            return labels[status] || '⚪ DESCONOCIDO';
+        }
+
+        function isMarketOpen(type) {
+            return marketStatus[type] === 'open';
+        }
+
+        function isMarketActive(type) {
+            // "Activo" = hay datos en tiempo real (open, pre-market, after-hours para stocks)
+            var status = marketStatus[type];
+            if (type === 'crypto') return true;
+            if (type === 'forex') return status === 'open';
+            // Stocks: open y after-hours tienen datos
+            return status === 'open' || status === 'pre-market' || status === 'after-hours';
+        }
+
+        function updateMarketStatusUI() {
+            // Actualizar indicador de status en el navbar (si existe)
+            var statusEl = document.getElementById('market-status-label');
+            if (statusEl) {
+                // Determinar status basado en el tipo de mercado del reel activo
+                var activeType = reelMarketType[guidebookState.activeReelId] || 'stocks';
+                statusEl.textContent = getMarketStatusLabel(activeType);
+            }
+
+            // Actualizar badge en el dropdown si está abierto
+            if (navbarState.activeDropdown) {
+                var activeMarket = MARKET_ASSETS[navbarState.activeDropdown];
+                if (activeMarket) {
+                    updateDropdownWsStatus(activeMarket.type);
+                }
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // NAVBAR DROPDOWN SYSTEM
         // ═════════════════════════════════════════════════════════════════════════
 
         function toggleMarketDropdown(marketKey) {
             var dropdown = document.getElementById('market-dropdown');
             var tabs = document.querySelectorAll('.market-tab');
 
-            // Si ya está abierto este mercado, cerrar
             if (navbarState.activeDropdown === marketKey) {
                 closeDropdown();
                 return;
             }
 
-            // Cerrar anterior y abrir nuevo
             navbarState.activeDropdown = marketKey;
 
-            // Activar tab correcto
             for (var i = 0; i < tabs.length; i++) {
                 tabs[i].classList.toggle('active', tabs[i].getAttribute('data-market') === marketKey);
             }
 
-            // Generar contenido del dropdown
             var market = MARKET_ASSETS[marketKey];
             var wsType = market.type;
             var statusClass = navbarState.wsStatus[wsType] || 'disconnected';
             var statusLabel = statusClass === 'connected' ? 'EN VIVO' : statusClass === 'connecting' ? 'CONECTANDO...' : 'DESCONECTADO';
 
+            // ✅ Agregar estado del mercado al header
+            var mktStatusLabel = getMarketStatusLabel(wsType);
+
             var html = '<div class="dropdown-header">' +
-                '<span class="dropdown-header-title">' + market.label + '</span>' +
+                '<div>' +
+                    '<span class="dropdown-header-title">' + market.label + '</span>' +
+                    '<span class="dropdown-market-status">' + mktStatusLabel + '</span>' +
+                '</div>' +
                 '<span class="dropdown-ws-status ' + statusClass + '">' +
                     '<span class="ws-dot ' + statusClass + '"></span>' +
                     statusLabel +
@@ -966,7 +1123,7 @@
             for (var j = 0; j < market.assets.length; j++) {
                 var asset = market.assets[j];
                 var displayTicker = asset.display || asset.ticker;
-                var priceText = asset.price > 0 ? '$' + asset.price.toFixed(2) : '--';
+                var priceText = asset.price > 0 ? formatPrice(asset.price) : '--';
                 var changeText = asset.price > 0 ? ((asset.change >= 0 ? '+' : '') + asset.change.toFixed(2) + '%') : '--';
                 var changeClass = asset.change >= 0 ? 'positive' : 'negative';
 
@@ -981,13 +1138,12 @@
             dropdown.innerHTML = html;
             dropdown.classList.add('open');
 
-            // Suscribir a WebSocket si no está conectado
             ensureWebSocketConnection(wsType);
         }
 
         function closeDropdown() {
             var dropdown = document.getElementById('market-dropdown');
-            dropdown.classList.remove('open');
+            if (dropdown) dropdown.classList.remove('open');
             navbarState.activeDropdown = null;
 
             var tabs = document.querySelectorAll('.market-tab');
@@ -996,7 +1152,6 @@
             }
         }
 
-        // Cerrar dropdown al hacer click fuera
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.cont2-header')) {
                 closeDropdown();
@@ -1004,7 +1159,7 @@
         });
 
         // ═════════════════════════════════════════════════════════════════════════
-        // ✅ NUEVO: REEL SELECTOR (elegir en cuál reel colocar)
+        // ✅ FIX: REEL SELECTOR — Corregido para reel principal
         // ═════════════════════════════════════════════════════════════════════════
 
         function onAssetClick(marketKey, assetIndex) {
@@ -1017,7 +1172,8 @@
                 ticker: asset.ticker,
                 displayTicker: asset.display || asset.ticker,
                 name: asset.name,
-                type: market.type
+                type: market.type,
+                currentPrice: asset.price  // ✅ Guardar precio actual si ya lo tenemos
             };
 
             showReelSelector(asset);
@@ -1028,12 +1184,18 @@
             var title = document.getElementById('reel-selector-title');
             var options = document.getElementById('reel-selector-options');
 
+            if (!overlay || !title || !options) {
+                console.error('[Selector] Elementos del selector no encontrados en el DOM');
+                return;
+            }
+
             title.textContent = 'Colocar ' + (asset.display || asset.ticker);
 
             var html = '';
             for (var i = 0; i < REELS_CONFIG.length; i++) {
                 var reel = REELS_CONFIG[i];
-                var slotLabel = reel.id === guidebookState.activeReelId ? 'PRINCIPAL' : 'SLOT ' + (i + 1);
+                var isMainReel = reel.id === guidebookState.activeReelId;
+                var slotLabel = isMainReel ? '★ PRINCIPAL' : 'SLOT ' + (i + 1);
                 var changeClass = reel.isPositive ? 'positive' : 'negative';
                 var changeText = (reel.isPositive ? '+' : '') + reel.change.toFixed(2) + '%';
 
@@ -1049,27 +1211,54 @@
         }
 
         function closeReelSelector() {
-            document.getElementById('reel-selector-overlay').classList.remove('visible');
+            var overlay = document.getElementById('reel-selector-overlay');
+            if (overlay) overlay.classList.remove('visible');
             navbarState.pendingAsset = null;
         }
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // ✅ FIX v2.0: assignToReel — CORREGIDO COMPLETAMENTE
+        // ═════════════════════════════════════════════════════════════════════════
+        // Bug original: Cuando el target era reel-4 (el principal), la función
+        // buscaba [data-reel-id="reel-4"] que solo existe en reels pequeños.
+        // El reel principal usa [data-main-symbol], [data-main-name], etc.
+        //
+        // Fix: Usar el mapa reelTickerMap para trackear tickers en JS (no DOM),
+        // y actualizar tanto el DOM del reel pequeño como el del principal.
+        // ═════════════════════════════════════════════════════════════════════════
 
         function assignToReel(reelId) {
             if (!navbarState.pendingAsset) return;
 
             var pending = navbarState.pendingAsset;
             var reel = findReelById(reelId);
-            if (!reel) return;
+            if (!reel) {
+                console.error('[assignToReel] No se encontró reel:', reelId);
+                return;
+            }
 
-            // Actualizar la configuración del reel
+            console.log('[assignToReel] Asignando ' + pending.displayTicker + ' → ' + reelId);
+
+            // ── 1. Actualizar configuración del reel en JS ──
             reel.symbol = pending.displayTicker;
             reel.name = pending.name;
             reel.color = getRandomColor();
 
-            // Generar nuevo historial de precios para el nuevo activo
-            guidebookState.priceHistory[reelId] = generatePriceHistory(reel.price || 100, 50);
+            // Si ya tenemos precio real del asset, usarlo
+            if (pending.currentPrice > 0) {
+                reel.price = pending.currentPrice;
+            }
+
+            // ── 2. Actualizar mapa de tickers (CENTRAL) ──
+            reelTickerMap[reelId] = pending.ticker;
+            reelMarketType[reelId] = pending.type;
+
+            // ── 3. Generar nuevo historial de precios ──
+            var basePrice = reel.price > 0 ? reel.price : 100;
+            guidebookState.priceHistory[reelId] = generatePriceHistory(basePrice, 50);
             guidebookState.chatMessages[reelId] = generateInitialChatMessages(pending.displayTicker);
 
-            // Actualizar el atributo data-symbol del reel en el DOM
+            // ── 4. Actualizar DOM del reel pequeño (si existe) ──
             var reelEl = document.querySelector('[data-reel-id="' + reelId + '"]');
             if (reelEl) {
                 reelEl.setAttribute('data-symbol', pending.ticker);
@@ -1079,25 +1268,112 @@
                 if (nameEl) nameEl.textContent = pending.name;
             }
 
-            // Suscribir este ticker al WebSocket
-            subscribeToTicker(pending.type, pending.ticker);
-
-            // Si es el reel activo, actualizar la vista principal
+            // ── 5. ✅ FIX: Si es el reel principal, actualizar vista principal ──
             if (reelId === guidebookState.activeReelId) {
-                switchToReel(reelId);
+                // Actualizar datos del header principal
+                updateMainReelData(reel);
+                // Actualizar chat
+                updateChatHeader(reel);
+                updateChatMessages(reelId);
+                updateChatInput(reel);
+                // Redibujar chart principal
+                drawMainChart();
+
+                console.log('[assignToReel] ✅ Reel principal actualizado: ' + pending.displayTicker);
             }
 
-            // Redibujar gráficas
+            // ── 6. Redibujar todas las gráficas ──
             drawAllCharts();
 
+            // ── 7. Suscribir al WebSocket ──
+            subscribeToTicker(pending.type, pending.ticker);
+
+            // ── 8. Si el mercado está cerrado, cargar último precio via REST ──
+            if (!isMarketActive(pending.type)) {
+                fetchLastPrice(pending.ticker, pending.type, reelId);
+            }
+
+            // ── 9. Cerrar overlays ──
             closeReelSelector();
             closeDropdown();
 
-            console.log('[Navbar] Asignado ' + pending.displayTicker + ' → ' + reelId);
+            // ── 10. Actualizar status de mercado ──
+            updateMarketStatusUI();
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // ✅ NUEVO: POLYGON WEBSOCKET REAL-TIME
+        // ✅ NUEVO: Fetch último precio via REST (para after-hours / cerrado)
+        // ═════════════════════════════════════════════════════════════════════════
+
+        function fetchLastPrice(ticker, type, reelId) {
+            var url = '';
+
+            if (type === 'stocks') {
+                // Polygon Previous Close endpoint
+                url = 'https://api.polygon.io/v2/aggs/ticker/' + ticker + '/prev?adjusted=true&apiKey=' + API_KEY;
+            } else if (type === 'crypto') {
+                var cleanTicker = ticker.replace('X:', '');
+                url = 'https://api.polygon.io/v2/aggs/ticker/' + ticker + '/prev?adjusted=true&apiKey=' + API_KEY;
+            } else if (type === 'forex') {
+                url = 'https://api.polygon.io/v2/aggs/ticker/' + ticker + '/prev?adjusted=true&apiKey=' + API_KEY;
+            }
+
+            if (!url) return;
+
+            console.log('[REST] Fetching last price for ' + ticker + '...');
+
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.results && data.results.length > 0) {
+                        var result = data.results[0];
+                        var price = result.c; // Close price
+                        var open = result.o;
+                        var change = open > 0 ? ((price - open) / open) * 100 : 0;
+
+                        console.log('[REST] ' + ticker + ' último precio: $' + price.toFixed(2) + ' (' + change.toFixed(2) + '%)');
+
+                        // Actualizar en el catálogo
+                        updateAssetPrice(ticker, price, type);
+                        updateAssetChange(ticker, change, type);
+
+                        // Actualizar el reel
+                        var reel = findReelById(reelId);
+                        if (reel) {
+                            reel.price = price;
+                            reel.change = change;
+                            reel.isPositive = change >= 0;
+
+                            // Regenerar historial con precio real
+                            guidebookState.priceHistory[reelId] = generatePriceHistory(price, 50);
+
+                            updateReelData(reelId, reel);
+                            if (reelId === guidebookState.activeReelId) {
+                                updateMainReelData(reel);
+                                drawMainChart();
+                            }
+                            drawAllCharts();
+                        }
+                    }
+                })
+                .catch(function(err) {
+                    console.warn('[REST] Error fetching price for ' + ticker + ':', err);
+                });
+        }
+
+        // Fetch prices para todos los reels al inicio
+        function fetchAllLastPrices() {
+            var reelIds = Object.keys(reelTickerMap);
+            for (var i = 0; i < reelIds.length; i++) {
+                var reelId = reelIds[i];
+                var ticker = reelTickerMap[reelId];
+                var type = reelMarketType[reelId];
+                fetchLastPrice(ticker, type, reelId);
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // POLYGON WEBSOCKET REAL-TIME
         // ═════════════════════════════════════════════════════════════════════════
 
         function ensureWebSocketConnection(type) {
@@ -1122,56 +1398,65 @@
 
             console.log('[WS] Conectando a ' + type + '...');
 
-            var ws = new WebSocket(urls[type]);
+            var ws;
+            try {
+                ws = new WebSocket(urls[type]);
+            } catch (e) {
+                console.error('[WS] Error creando WebSocket:', e);
+                navbarState.wsStatus[type] = 'disconnected';
+                return;
+            }
 
             ws.onopen = function() {
                 console.log('[WS] Conexión abierta: ' + type);
-                // Autenticar
                 ws.send(JSON.stringify({ action: 'auth', params: API_KEY }));
             };
 
             ws.onmessage = function(event) {
-                var data = JSON.parse(event.data);
+                var data;
+                try {
+                    data = JSON.parse(event.data);
+                } catch (e) {
+                    return;
+                }
 
-                if (Array.isArray(data)) {
-                    for (var i = 0; i < data.length; i++) {
-                        var msg = data[i];
+                if (!Array.isArray(data)) return;
 
-                        // Respuesta de autenticación
-                        if (msg.ev === 'status') {
-                            if (msg.status === 'auth_success') {
-                                console.log('[WS] Autenticado: ' + type);
-                                navbarState.wsStatus[type] = 'connected';
-                                reconnectAttempts[type] = 0;
-                                updateDropdownWsStatus(type);
-                                // Suscribir todos los tickers de este tipo
-                                subscribeAllTickers(type);
-                            } else if (msg.status === 'auth_failed') {
-                                console.error('[WS] Auth falló: ' + type);
-                                navbarState.wsStatus[type] = 'disconnected';
-                                updateDropdownWsStatus(type);
-                            }
+                for (var i = 0; i < data.length; i++) {
+                    var msg = data[i];
+
+                    // Auth response
+                    if (msg.ev === 'status') {
+                        if (msg.status === 'auth_success') {
+                            console.log('[WS] ✅ Autenticado: ' + type);
+                            navbarState.wsStatus[type] = 'connected';
+                            reconnectAttempts[type] = 0;
+                            updateDropdownWsStatus(type);
+                            subscribeAllTickers(type);
+                            guidebookState.useRealData = true;
+                        } else if (msg.status === 'auth_failed') {
+                            console.error('[WS] ❌ Auth falló: ' + type);
+                            navbarState.wsStatus[type] = 'disconnected';
+                            updateDropdownWsStatus(type);
                         }
+                        continue;
+                    }
 
-                        // Trades de stocks (ev: "T")
-                        if (msg.ev === 'T' && type === 'stocks') {
-                            handleStockTrade(msg);
-                        }
-
-                        // Trades de crypto (ev: "XT")
-                        if (msg.ev === 'XT' && type === 'crypto') {
-                            handleCryptoTrade(msg);
-                        }
-
-                        // Quotes de forex (ev: "C")
-                        if (msg.ev === 'C' && type === 'forex') {
-                            handleForexQuote(msg);
-                        }
-
-                        // Aggregates (ev: "AM" / "A") para stocks
-                        if ((msg.ev === 'AM' || msg.ev === 'A') && type === 'stocks') {
-                            handleStockAggregate(msg);
-                        }
+                    // Stock trades
+                    if (msg.ev === 'T' && type === 'stocks') {
+                        handleStockTrade(msg);
+                    }
+                    // Stock aggregates
+                    if ((msg.ev === 'AM' || msg.ev === 'A') && type === 'stocks') {
+                        handleStockAggregate(msg);
+                    }
+                    // Crypto trades
+                    if (msg.ev === 'XT' && type === 'crypto') {
+                        handleCryptoTrade(msg);
+                    }
+                    // Forex quotes
+                    if (msg.ev === 'C' && type === 'forex') {
+                        handleForexQuote(msg);
                     }
                 }
 
@@ -1184,12 +1469,13 @@
                 navbarState.wsStatus[type] = 'disconnected';
                 updateDropdownWsStatus(type);
 
-                // Reconectar con backoff
-                if (reconnectAttempts[type] < 5) {
+                if (reconnectAttempts[type] < MAX_RECONNECT) {
                     var delay = Math.min(1000 * Math.pow(2, reconnectAttempts[type]), 30000);
                     reconnectAttempts[type]++;
-                    console.log('[WS] Reconectando ' + type + ' en ' + delay + 'ms...');
+                    console.log('[WS] Reconectando ' + type + ' en ' + delay + 'ms (intento ' + reconnectAttempts[type] + '/' + MAX_RECONNECT + ')');
                     setTimeout(function() { connectWebSocket(type); }, delay);
+                } else {
+                    console.warn('[WS] Máximo de reconexiones alcanzado para ' + type + '. Usando simulación.');
                 }
             };
 
@@ -1197,7 +1483,6 @@
                 console.error('[WS] Error en ' + type + ':', error);
             };
 
-            // Guardar referencia
             if (type === 'stocks') stocksSocket = ws;
             if (type === 'crypto') cryptoSocket = ws;
             if (type === 'forex') forexSocket = ws;
@@ -1212,10 +1497,17 @@
                 if (market.type === type) {
                     for (var j = 0; j < market.assets.length; j++) {
                         var ticker = market.assets[j].ticker;
-                        if (tickers.indexOf(ticker) === -1) {
-                            tickers.push(ticker);
-                        }
+                        if (tickers.indexOf(ticker) === -1) tickers.push(ticker);
                     }
+                }
+            }
+
+            // También suscribir tickers de los reels actuales
+            var reelIds = Object.keys(reelTickerMap);
+            for (var k = 0; k < reelIds.length; k++) {
+                if (reelMarketType[reelIds[k]] === type) {
+                    var t = reelTickerMap[reelIds[k]];
+                    if (tickers.indexOf(t) === -1) tickers.push(t);
                 }
             }
 
@@ -1224,21 +1516,17 @@
             var ws = type === 'stocks' ? stocksSocket : type === 'crypto' ? cryptoSocket : forexSocket;
             if (!ws || ws.readyState !== 1) return;
 
-            // Suscribir a trades y aggregates
             if (type === 'stocks') {
-                var tradeSubs = tickers.map(function(t) { return 'T.' + t; }).join(',');
-                var aggSubs = tickers.map(function(t) { return 'AM.' + t; }).join(',');
-                ws.send(JSON.stringify({ action: 'subscribe', params: tradeSubs + ',' + aggSubs }));
-                console.log('[WS] Suscrito a stocks:', tickers);
+                var subs = tickers.map(function(t) { return 'T.' + t; }).join(',');
+                subs += ',' + tickers.map(function(t) { return 'AM.' + t; }).join(',');
+                ws.send(JSON.stringify({ action: 'subscribe', params: subs }));
             } else if (type === 'crypto') {
-                var cryptoSubs = tickers.map(function(t) { return 'XT.' + t; }).join(',');
-                ws.send(JSON.stringify({ action: 'subscribe', params: cryptoSubs }));
-                console.log('[WS] Suscrito a crypto:', tickers);
+                ws.send(JSON.stringify({ action: 'subscribe', params: tickers.map(function(t) { return 'XT.' + t; }).join(',') }));
             } else if (type === 'forex') {
-                var fxSubs = tickers.map(function(t) { return 'C.' + t; }).join(',');
-                ws.send(JSON.stringify({ action: 'subscribe', params: fxSubs }));
-                console.log('[WS] Suscrito a forex:', tickers);
+                ws.send(JSON.stringify({ action: 'subscribe', params: tickers.map(function(t) { return 'C.' + t; }).join(',') }));
             }
+
+            console.log('[WS] Suscrito a ' + type + ':', tickers.length + ' tickers');
         }
 
         function subscribeToTicker(type, ticker) {
@@ -1252,19 +1540,17 @@
                 ws.send(JSON.stringify({ action: 'subscribe', params: 'AM.' + ticker }));
             }
 
-            console.log('[WS] Suscrito a nuevo ticker:', ticker);
+            console.log('[WS] Suscrito a ticker:', ticker);
         }
 
-        // ── Handlers de datos en tiempo real ──
+        // ── Trade Handlers ──
 
         function handleStockTrade(msg) {
-            // msg.sym = ticker, msg.p = price, msg.s = size
             updateAssetPrice(msg.sym, msg.p, 'stocks');
             updateReelIfMatches(msg.sym, msg.p);
         }
 
         function handleStockAggregate(msg) {
-            // msg.sym = ticker, msg.c = close, msg.o = open
             if (msg.c && msg.o) {
                 var change = ((msg.c - msg.o) / msg.o) * 100;
                 updateAssetChange(msg.sym, change, 'stocks');
@@ -1272,20 +1558,27 @@
         }
 
         function handleCryptoTrade(msg) {
-            // msg.pair = ticker (e.g., "X:BTCUSD"), msg.p = price
             var ticker = msg.pair;
             updateAssetPrice(ticker, msg.p, 'crypto');
             updateReelIfMatches(ticker, msg.p);
         }
 
         function handleForexQuote(msg) {
-            // msg.p = pair (e.g., "C:EURUSD"), msg.a = ask price
             var ticker = msg.p;
             updateAssetPrice(ticker, msg.a, 'forex');
             updateReelIfMatches(ticker, msg.a);
         }
 
-        // Actualizar precio en el catálogo y en el dropdown
+        // ═════════════════════════════════════════════════════════════════════════
+        // ACTUALIZACIÓN DE PRECIOS — Catálogo + Dropdown
+        // ═════════════════════════════════════════════════════════════════════════
+
+        function formatPrice(price) {
+            if (price >= 1) return '$' + price.toFixed(2);
+            if (price >= 0.01) return '$' + price.toFixed(4);
+            return '$' + price.toFixed(6);
+        }
+
         function updateAssetPrice(ticker, price, type) {
             var markets = Object.keys(MARKET_ASSETS);
             for (var i = 0; i < markets.length; i++) {
@@ -1295,13 +1588,9 @@
                     if (market.assets[j].ticker === ticker) {
                         var oldPrice = market.assets[j].price;
                         market.assets[j].price = price;
-
-                        // Calcular cambio si hay precio anterior
                         if (oldPrice > 0) {
                             market.assets[j].change = ((price - oldPrice) / oldPrice) * 100;
                         }
-
-                        // Actualizar DOM del dropdown si está visible
                         updateDropdownAssetDOM(ticker, market.assets[j]);
                     }
                 }
@@ -1322,14 +1611,13 @@
             }
         }
 
-        // Actualizar un asset en el dropdown visible
         function updateDropdownAssetDOM(ticker, asset) {
             var priceEl = document.querySelector('[data-nav-price="' + ticker + '"]');
             var changeEl = document.querySelector('[data-nav-change="' + ticker + '"]');
             var row = document.querySelector('[data-asset-ticker="' + ticker + '"]');
 
             if (priceEl && asset.price > 0) {
-                priceEl.textContent = '$' + asset.price.toFixed(2);
+                priceEl.textContent = formatPrice(asset.price);
             }
 
             if (changeEl && asset.price > 0) {
@@ -1338,41 +1626,56 @@
                 changeEl.className = 'asset-change ' + (asset.change >= 0 ? 'positive' : 'negative');
             }
 
-            // Flash de actualización
             if (row) {
                 row.classList.remove('price-updated');
-                void row.offsetWidth; // force reflow
+                void row.offsetWidth;
                 row.classList.add('price-updated');
             }
         }
 
-        // Actualizar el reel si el ticker coincide
+        // ═════════════════════════════════════════════════════════════════════════
+        // ✅ FIX v2.0: updateReelIfMatches — Ahora usa reelTickerMap
+        // ═════════════════════════════════════════════════════════════════════════
+        // Bug original: Solo buscaba data-symbol en el DOM de reels pequeños.
+        // El reel principal (reel-4) no tenía ese atributo, así que nunca
+        // recibía actualizaciones en tiempo real.
+        //
+        // Fix: Usar reelTickerMap (mapa en JS) para buscar coincidencias
+        // en TODOS los reels, incluyendo el principal.
+        // ═════════════════════════════════════════════════════════════════════════
+
         function updateReelIfMatches(ticker, price) {
-            for (var i = 0; i < REELS_CONFIG.length; i++) {
-                var reel = REELS_CONFIG[i];
-                var reelEl = document.querySelector('[data-reel-id="' + reel.id + '"]');
-                var reelTicker = reelEl ? reelEl.getAttribute('data-symbol') : '';
+            var reelIds = Object.keys(reelTickerMap);
 
-                if (reelTicker === ticker) {
-                    reel.price = price;
-                    var history = guidebookState.priceHistory[reel.id];
-                    if (history && history.length > 0) {
-                        reel.change = ((price - history[0].price) / history[0].price) * 100;
-                        reel.isPositive = reel.change >= 0;
-                        history.push({ time: Date.now(), price: price });
-                        if (history.length > 100) history.shift();
-                    }
+            for (var i = 0; i < reelIds.length; i++) {
+                var reelId = reelIds[i];
 
-                    updateReelData(reel.id, reel);
-                    if (reel.id === guidebookState.activeReelId) {
-                        updateMainReelData(reel);
-                    }
+                // ✅ Comparar contra el mapa central, NO contra el DOM
+                if (reelTickerMap[reelId] !== ticker) continue;
+
+                var reel = findReelById(reelId);
+                if (!reel) continue;
+
+                reel.price = price;
+
+                var history = guidebookState.priceHistory[reelId];
+                if (history && history.length > 0) {
+                    reel.change = ((price - history[0].price) / history[0].price) * 100;
+                    reel.isPositive = reel.change >= 0;
+                    history.push({ time: Date.now(), price: price });
+                    if (history.length > 100) history.shift();
+                }
+
+                // Actualizar UI del reel (pequeño o principal)
+                updateReelData(reelId, reel);
+
+                if (reelId === guidebookState.activeReelId) {
+                    updateMainReelData(reel);
                 }
             }
         }
 
         function updateDropdownWsStatus(type) {
-            // Solo actualizar si el dropdown activo corresponde a este tipo
             if (!navbarState.activeDropdown) return;
             var activeMarket = MARKET_ASSETS[navbarState.activeDropdown];
             if (!activeMarket || activeMarket.type !== type) return;
@@ -1381,13 +1684,33 @@
             if (!statusEl) return;
 
             var status = navbarState.wsStatus[type];
-            var label = status === 'connected' ? 'EN VIVO' : status === 'connecting' ? 'CONECTANDO...' : 'DESCONECTADO';
-            statusEl.className = 'dropdown-ws-status ' + status;
-            statusEl.innerHTML = '<span class="ws-dot ' + status + '"></span>' + label;
+            var mktStatus = marketStatus[type];
+
+            // Combinar WS status con market status
+            var label, cssClass;
+            if (status === 'connected' && (mktStatus === 'open' || mktStatus === 'pre-market')) {
+                label = '🟢 EN VIVO';
+                cssClass = 'connected';
+            } else if (status === 'connected' && mktStatus === 'after-hours') {
+                label = '🟠 AFTER HOURS';
+                cssClass = 'connected';
+            } else if (status === 'connected' && mktStatus === 'closed') {
+                label = '🔴 CERRADO (último cierre)';
+                cssClass = 'connected';
+            } else if (status === 'connecting') {
+                label = '🟡 CONECTANDO...';
+                cssClass = 'connecting';
+            } else {
+                label = '⚪ DESCONECTADO';
+                cssClass = 'disconnected';
+            }
+
+            statusEl.className = 'dropdown-ws-status ' + cssClass;
+            statusEl.innerHTML = '<span class="ws-dot ' + cssClass + '"></span>' + label;
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // FUNCIONES DE ACTUALIZACIÓN SELECTIVA (original)
+        // FUNCIONES DE ACTUALIZACIÓN DE UI (Reels)
         // ═════════════════════════════════════════════════════════════════════════
 
         function updateReelData(reelId, reel) {
@@ -1395,7 +1718,7 @@
             if (!reelEl) return;
 
             var priceEl = reelEl.querySelector('[data-price="' + reelId + '"]');
-            if (priceEl) priceEl.textContent = '$' + reel.price.toFixed(2);
+            if (priceEl) priceEl.textContent = formatPrice(reel.price);
 
             var changeEl = reelEl.querySelector('[data-change="' + reelId + '"]');
             if (changeEl) {
@@ -1414,13 +1737,16 @@
             if (nameEl) nameEl.textContent = reel.name;
 
             var priceEl = document.querySelector('[data-main-price]');
-            if (priceEl) priceEl.textContent = '$' + reel.price.toFixed(2);
+            if (priceEl) priceEl.textContent = formatPrice(reel.price);
 
             var changeEl = document.querySelector('[data-main-change]');
             if (changeEl) {
                 changeEl.textContent = (reel.isPositive ? '+' : '') + reel.change.toFixed(2) + '%';
                 changeEl.className = 'main-reel-change ' + (reel.isPositive ? 'positive' : 'negative');
             }
+
+            // ✅ Actualizar estado de mercado visible
+            updateMarketStatusUI();
         }
 
         function updateChatHeader(reel) {
@@ -1439,11 +1765,11 @@
             if (!messagesEl) return;
 
             var messages = guidebookState.chatMessages[reelId] || [];
-            var messagesHtml = '';
+            var html = '';
 
             for (var i = 0; i < messages.length; i++) {
                 var msg = messages[i];
-                messagesHtml += '<div class="chat-message">' +
+                html += '<div class="chat-message">' +
                     '<div class="chat-msg-avatar" style="background-color: ' + msg.color + '">' + msg.avatar + '</div>' +
                     '<div class="chat-msg-content">' +
                         '<span class="chat-msg-user">' + msg.user + '</span>' +
@@ -1452,7 +1778,7 @@
                 '</div>';
             }
 
-            messagesEl.innerHTML = messagesHtml;
+            messagesEl.innerHTML = html;
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
@@ -1476,10 +1802,11 @@
             }
 
             drawMainChart();
+            updateMarketStatusUI();
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // GENERADORES DE DATOS (original)
+        // GENERADORES DE DATOS
         // ─────────────────────────────────────────────────────────────────────────
         function generatePriceHistory(basePrice, points) {
             var history = [];
@@ -1501,19 +1828,37 @@
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // SIMULACIONES (original + integración real-time)
+        // SIMULACIONES — Con lógica de After Hours
         // ─────────────────────────────────────────────────────────────────────────
+
         function startPriceSimulation() {
             if (guidebookState.simulationInterval) clearInterval(guidebookState.simulationInterval);
 
             guidebookState.simulationInterval = setInterval(function() {
                 for (var i = 0; i < REELS_CONFIG.length; i++) {
                     var reel = REELS_CONFIG[i];
-                    var history = guidebookState.priceHistory[reel.id];
+                    var reelId = reel.id;
+                    var type = reelMarketType[reelId] || 'stocks';
+
+                    var history = guidebookState.priceHistory[reelId];
                     if (!history || history.length === 0) continue;
 
+                    // ✅ Si el mercado está activo Y tenemos WS conectado, NO simular
+                    // (los datos reales llegan por updateReelIfMatches)
+                    if (isMarketActive(type) && navbarState.wsStatus[type] === 'connected') {
+                        continue; // Datos reales, no simular
+                    }
+
+                    // ✅ Si el mercado está cerrado o no hay WS, simular con volatilidad reducida
+                    var volatility = 0.006; // Normal
+                    if (marketStatus[type] === 'after-hours') {
+                        volatility = 0.002; // After hours: menor volatilidad
+                    } else if (marketStatus[type] === 'closed') {
+                        volatility = 0.0005; // Cerrado: mínima variación (efecto visual)
+                    }
+
                     var lastPrice = history[history.length - 1].price;
-                    var newPrice = lastPrice * (1 + (Math.random() - 0.48) * 0.006);
+                    var newPrice = lastPrice * (1 + (Math.random() - 0.48) * volatility);
 
                     history.push({ time: Date.now(), price: newPrice });
                     if (history.length > 100) history.shift();
@@ -1522,8 +1867,8 @@
                     reel.change = ((newPrice - history[0].price) / history[0].price) * 100;
                     reel.isPositive = reel.change >= 0;
 
-                    updateReelData(reel.id, reel);
-                    if (reel.id === guidebookState.activeReelId) {
+                    updateReelData(reelId, reel);
+                    if (reelId === guidebookState.activeReelId) {
                         updateMainReelData(reel);
                     }
                 }
@@ -1533,15 +1878,15 @@
 
         function startChatSimulation() {
             var users = [
-                { user: 'DayTrader99', avatar: '⚡' }, 
-                { user: 'SwingKing', avatar: '👑' }, 
+                { user: 'DayTrader99', avatar: '⚡' },
+                { user: 'SwingKing', avatar: '👑' },
                 { user: 'ChartMaster', avatar: '📊' },
                 { user: 'BullRunner', avatar: '🏃‍♂️' },
                 { user: 'TechAnalyst', avatar: '🔬' }
             ];
-            
+
             var messages = [
-                'Buen momento para entrar', 'Cuidado con la resistencia', 'HODL! 💎', 
+                'Buen momento para entrar', 'Cuidado con la resistencia', 'HODL! 💎',
                 'Target alcanzado 🎯', 'Bullish! 🚀', 'Support holding strong',
                 'Breaking out! 📈', 'Volume increasing', 'Momentum building'
             ];
@@ -1549,11 +1894,11 @@
             function addRandomMessage() {
                 var randomReelId = REELS_CONFIG[Math.floor(Math.random() * REELS_CONFIG.length)].id;
                 var randomUser = users[Math.floor(Math.random() * users.length)];
-                addChatMessage(randomReelId, { 
-                    user: randomUser.user, 
-                    avatar: randomUser.avatar, 
-                    text: messages[Math.floor(Math.random() * messages.length)], 
-                    color: getRandomColor() 
+                addChatMessage(randomReelId, {
+                    user: randomUser.user,
+                    avatar: randomUser.avatar,
+                    text: messages[Math.floor(Math.random() * messages.length)],
+                    color: getRandomColor()
                 });
                 setTimeout(addRandomMessage, 3000 + Math.random() * 8000);
             }
@@ -1568,7 +1913,7 @@
             if (reelId === guidebookState.activeReelId) {
                 var messagesEl = document.querySelector('[data-chat-messages]');
                 if (messagesEl) {
-                    messagesEl.insertAdjacentHTML('beforeend', 
+                    messagesEl.insertAdjacentHTML('beforeend',
                         '<div class="chat-message">' +
                             '<div class="chat-msg-avatar" style="background-color: ' + message.color + '">' + message.avatar + '</div>' +
                             '<div class="chat-msg-content">' +
@@ -1584,7 +1929,7 @@
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // GRÁFICAS (original)
+        // GRÁFICAS
         // ─────────────────────────────────────────────────────────────────────────
         function drawAllCharts() {
             for (var i = 0; i < guidebookState.smallReels.length; i++) {
@@ -1656,6 +2001,7 @@
             var chartWidth = canvas.width - padding.left - padding.right;
             var chartHeight = canvas.height - padding.top - padding.bottom;
 
+            // Grid lines
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
             ctx.lineWidth = 1;
             for (var g = 0; g <= 6; g++) {
@@ -1666,9 +2012,27 @@
                 ctx.stroke();
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.font = '11px sans-serif';
-                ctx.fillText('$' + (maxPrice - (priceRange / 6) * g).toFixed(2), canvas.width - padding.right + 10, gy + 4);
+                ctx.fillText(formatPrice(maxPrice - (priceRange / 6) * g), canvas.width - padding.right + 10, gy + 4);
             }
 
+            // ✅ Mostrar indicador de mercado en el chart
+            var activeType = reelMarketType[guidebookState.activeReelId] || 'stocks';
+            var mktLabel = '';
+            if (marketStatus[activeType] === 'after-hours') {
+                mktLabel = '🟠 AFTER HOURS';
+            } else if (marketStatus[activeType] === 'closed') {
+                mktLabel = '🔴 CERRADO';
+            } else if (marketStatus[activeType] === 'pre-market') {
+                mktLabel = '🟡 PRE-MARKET';
+            }
+
+            if (mktLabel) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.font = '12px sans-serif';
+                ctx.fillText(mktLabel, padding.left + 5, padding.top + 15);
+            }
+
+            // Price line
             ctx.beginPath();
             ctx.strokeStyle = reel.isPositive ? '#22c55e' : '#ef4444';
             ctx.lineWidth = 3;
@@ -1681,6 +2045,7 @@
             }
             ctx.stroke();
 
+            // Gradient fill
             ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
             ctx.lineTo(padding.left, padding.top + chartHeight);
             ctx.closePath();
@@ -1690,12 +2055,12 @@
             ctx.fillStyle = gradient;
             ctx.fill();
 
+            // End dot
             var lastY = padding.top + chartHeight - ((history[history.length - 1].price - minPrice) / priceRange) * chartHeight;
             ctx.beginPath();
             ctx.arc(padding.left + chartWidth, lastY, 8, 0, Math.PI * 2);
             ctx.fillStyle = reel.isPositive ? '#22c55e' : '#ef4444';
             ctx.fill();
-            
             ctx.beginPath();
             ctx.arc(padding.left + chartWidth, lastY, 8, 0, Math.PI * 2);
             ctx.strokeStyle = '#ffffff';
@@ -1704,33 +2069,33 @@
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // INTERACCIONES (original)
+        // INTERACCIONES
         // ─────────────────────────────────────────────────────────────────────────
         function setupReelInteractions() {
             var smallReels = document.querySelectorAll('.reel-small');
             for (var i = 0; i < smallReels.length; i++) {
                 (function(reelEl) {
                     var reelId = reelEl.getAttribute('data-reel-id');
-                    
+
                     reelEl.addEventListener('click', function(e) {
                         if (!reelEl.classList.contains('dragging')) {
                             swapReelsWithClick(reelId);
                         }
                     });
 
-                    reelEl.addEventListener('dragstart', function(e) { 
-                        e.dataTransfer.setData('text/plain', reelId); 
-                        reelEl.classList.add('dragging'); 
+                    reelEl.addEventListener('dragstart', function(e) {
+                        e.dataTransfer.setData('text/plain', reelId);
+                        reelEl.classList.add('dragging');
                     });
-                    reelEl.addEventListener('dragend', function() { 
-                        reelEl.classList.remove('dragging'); 
+                    reelEl.addEventListener('dragend', function() {
+                        reelEl.classList.remove('dragging');
                     });
-                    reelEl.addEventListener('dragover', function(e) { 
-                        e.preventDefault(); 
-                        reelEl.classList.add('drag-over'); 
+                    reelEl.addEventListener('dragover', function(e) {
+                        e.preventDefault();
+                        reelEl.classList.add('drag-over');
                     });
-                    reelEl.addEventListener('dragleave', function() { 
-                        reelEl.classList.remove('drag-over'); 
+                    reelEl.addEventListener('dragleave', function() {
+                        reelEl.classList.remove('drag-over');
                     });
                     reelEl.addEventListener('drop', function(e) {
                         e.preventDefault();
@@ -1745,15 +2110,15 @@
         function setupChatInteractions() {
             var input = document.querySelector('[data-chat-input]');
             var sendBtn = document.querySelector('[data-chat-send]');
-            
+
             if (input) {
-                input.addEventListener('keypress', function(e) { 
-                    if (e.key === 'Enter') sendUserChatMessage(); 
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') sendUserChatMessage();
                 });
             }
             if (sendBtn) {
-                sendBtn.addEventListener('click', function() { 
-                    sendUserChatMessage(); 
+                sendBtn.addEventListener('click', function() {
+                    sendUserChatMessage();
                 });
             }
         }
@@ -1775,11 +2140,11 @@
         function sendUserChatMessage() {
             var input = document.querySelector('[data-chat-input]');
             if (!input || !input.value.trim()) return;
-            addChatMessage(guidebookState.activeReelId, { 
-                user: 'Tu', 
-                avatar: '😎', 
-                text: input.value.trim(), 
-                color: '#3b82f6' 
+            addChatMessage(guidebookState.activeReelId, {
+                user: 'Tu',
+                avatar: '😎',
+                text: input.value.trim(),
+                color: '#3b82f6'
             });
             input.value = '';
         }
@@ -1787,9 +2152,9 @@
         function swapReelsWithClick(clickedReelId) {
             var currentMainReelId = guidebookState.activeReelId;
             var clickedIndex = guidebookState.smallReels.indexOf(clickedReelId);
-            
             if (clickedIndex === -1) return;
-            
+
+            // ✅ También intercambiar en el mapa de tickers
             guidebookState.smallReels[clickedIndex] = currentMainReelId;
             switchToReel(clickedReelId);
         }
@@ -1812,15 +2177,24 @@
         // INICIALIZACIÓN
         // ─────────────────────────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('📊 Guidebook Module + Navbar de Mercados - Iniciando...');
+            console.log('═══════════════════════════════════════════════');
+            console.log('📊 Guidebook Module v2.0 — Iniciando...');
+            console.log('═══════════════════════════════════════════════');
 
-            // Generar datos iniciales
+            // 1. Detectar horario de mercado
+            checkMarketHours();
+            console.log('[Market] Stocks:', marketStatus.stocks);
+            console.log('[Market] Crypto:', marketStatus.crypto);
+            console.log('[Market] Forex:', marketStatus.forex);
+
+            // 2. Generar datos iniciales para cada reel
             for (var i = 0; i < REELS_CONFIG.length; i++) {
                 var reel = REELS_CONFIG[i];
                 guidebookState.priceHistory[reel.id] = generatePriceHistory(reel.price, 50);
                 guidebookState.chatMessages[reel.id] = generateInitialChatMessages(reel.symbol);
             }
 
+            // 3. Inicializar UI
             setTimeout(function() {
                 switchToReel(guidebookState.activeReelId);
                 setupReelInteractions();
@@ -1829,17 +2203,41 @@
                 startPriceSimulation();
                 startChatSimulation();
                 drawAllCharts();
-                
-                console.log('📊 Guidebook Module + Navbar - Listo ✅');
-                console.log('🆕 Features:');
-                console.log('  • Navbar con 5 mercados (DOW, NASDAQ, S&P, FX, Crypto)');
-                console.log('  • Dropdowns con Top 10 activos por categoría');
-                console.log('  • WebSocket Polygon Pro para datos en tiempo real');
-                console.log('  • Selector de reel al elegir un activo');
-                console.log('  • Flash animation en actualizaciones de precio');
+                updateMarketStatusUI();
+
+                // 4. Cargar precios reales via REST
+                fetchAllLastPrices();
+
+                // 5. Conectar WebSockets para mercados activos
+                if (isMarketActive('stocks')) {
+                    connectWebSocket('stocks');
+                } else {
+                    console.log('[WS] Bolsa cerrada — usando último cierre + simulación mínima');
+                }
+
+                // Crypto siempre activo
+                connectWebSocket('crypto');
+
+                if (isMarketActive('forex')) {
+                    connectWebSocket('forex');
+                }
+
+                // 6. Revisar horario periódicamente
+                setInterval(function() {
+                    checkMarketHours();
+                }, marketStatus.checkInterval);
+
+                console.log('═══════════════════════════════════════════════');
+                console.log('📊 Guidebook v2.0 — Listo ✅');
+                console.log('  • Reel principal fix: ACTIVO');
+                console.log('  • reelTickerMap tracking: ACTIVO');
+                console.log('  • Market hours detection: ACTIVO');
+                console.log('  • After-hours mode: ACTIVO');
+                console.log('  • REST fallback prices: ACTIVO');
+                console.log('═══════════════════════════════════════════════');
             }, 100);
         });
     </script>
-
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 </body>
 </html>
