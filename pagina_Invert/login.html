@@ -645,40 +645,47 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <script>
-        // ═════════════════════════════════════════════════════════════════════
-        // FIREBASE CONFIG
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
+        // DONTRADING — AUTH MODULE v1.3
+        // ✅ FIX: Firebase Config actualizado a proyecto "dontrading-pro"
+        // ✅ SDK: Compat (firebase.auth(), firebase.firestore())
+        // ✅ Providers: Phone Auth + Email/Password
+        // ═════════════════════════════════════════════════════════════════════════════
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // FIREBASE CONFIG — PROYECTO: dontrading-pro (Plan Blaze)
+        // ─────────────────────────────────────────────────────────────────────────────
         var firebaseConfig = {
-            apiKey: "AIzaSyCio9NFlS56QMkJAdsqW1A3NsxA-9RtT88",
-            authDomain: "doctraider-2026.firebaseapp.com",
-            projectId: "doctraider-2026",
-            storageBucket: "doctraider-2026.firebasestorage.app",
-            messagingSenderId: "771234945216",
-            appId: "1:771234945216:web:f598917d75704dac86f525",
-            measurementId: "G-Y9TM6H9D3D"
+            apiKey: "AIzaSyAdKShZMYYdmZ3bkmaDWsEhsLsT0YIgz-8",
+            authDomain: "dontrading-pro.firebaseapp.com",
+            projectId: "dontrading-pro",
+            storageBucket: "dontrading-pro.firebasestorage.app",
+            messagingSenderId: "684854856085",
+            appId: "1:684854856085:web:fd18dc2c46ff13ea81ce9c",
+            measurementId: "G-FYNX14F2VY"
         };
 
         firebase.initializeApp(firebaseConfig);
         var auth = firebase.auth();
         var db = firebase.firestore();
 
-        // ═══════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
         // LOCALIZACIÓN — para que el SMS llegue en español
-        // ═══════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
         auth.languageCode = 'es';
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // STATE
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         var confirmationResultLogin = null;
         var confirmationResultRegister = null;
         var recaptchaVerifierLogin = null;
         var recaptchaVerifierRegister = null;
         var pendingRegData = {};
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // VIEW MANAGEMENT
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         function showView(viewName) {
             document.querySelectorAll('.form-view').forEach(function(v) { v.classList.remove('active'); });
             var target = document.getElementById('view-' + viewName);
@@ -701,9 +708,9 @@
             });
         });
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // ALERTS
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         function showAlert(type, message) {
             var box = document.getElementById('alertBox');
             var icon = document.getElementById('alertIcon');
@@ -724,9 +731,9 @@
             document.getElementById('alertBox').className = 'alert';
         }
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // UTILITIES
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         function formatPhoneForDisplay(phone) {
             var digits = phone.replace(/\D/g, '');
             if (digits.length === 10) {
@@ -782,9 +789,9 @@
             }
         }
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // OTP INPUT HANDLING
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         function setupOTPInputs(groupId) {
             var inputs = document.querySelectorAll('#' + groupId + ' .otp-digit');
             inputs.forEach(function(input, index) {
@@ -826,17 +833,9 @@
         setupOTPInputs('loginOtpGroup');
         setupOTPInputs('regOtpGroup');
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // RECAPTCHA SETUP
-        // ═════════════════════════════════════════════════════════════════════
-        // FIX PRINCIPAL: Para reCAPTCHA invisible, el primer parámetro debe
-        // ser el ID del BOTÓN que dispara el submit, NO un div contenedor.
-        // Según docs Firebase:
-        //   new RecaptchaVerifier(auth, 'sign-in-button', { size: 'invisible' })
-        //
-        // Para compat SDK la firma es:
-        //   new firebase.auth.RecaptchaVerifier('button-id', { size: 'invisible' })
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         function setupRecaptchaInvisible(buttonId) {
             var verifier = new firebase.auth.RecaptchaVerifier(buttonId, {
                 'size': 'invisible',
@@ -850,7 +849,6 @@
             return verifier;
         }
 
-        // Helper seguro para limpiar reCAPTCHA antes de recrear
         function safeResetRecaptcha(verifier) {
             try {
                 if (verifier) {
@@ -862,9 +860,9 @@
             return null;
         }
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // LOGIN FLOW
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         async function handleLogin() {
             hideAlert();
             var phone = document.getElementById('loginPhone').value.trim();
@@ -920,15 +918,11 @@
 
         async function sendLoginOTP(phoneNumber) {
             try {
-                // Limpiar verifier anterior si existe
                 recaptchaVerifierLogin = safeResetRecaptcha(recaptchaVerifierLogin);
-
-                // FIX: Vincular reCAPTCHA invisible al botón de login
                 recaptchaVerifierLogin = setupRecaptchaInvisible('btnLogin');
 
                 confirmationResultLogin = await auth.signInWithPhoneNumber(phoneNumber, recaptchaVerifierLogin);
 
-                // Show OTP inputs
                 document.getElementById('loginVerify').classList.add('active');
                 document.getElementById('btnLogin').style.display = 'none';
                 document.getElementById('loginVerifyPhone').textContent = phoneNumber;
@@ -964,11 +958,9 @@
             sendLoginOTP(phone);
         }
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // REGISTER FLOW
-        // ═════════════════════════════════════════════════════════════════════
-
-        // Recolectar datos del formulario ANTES de enviar OTP
+        // ═════════════════════════════════════════════════════════════════════════════
         function collectRegisterData() {
             var nameEl = document.getElementById('regName');
             var phoneEl = document.getElementById('regPhone');
@@ -987,8 +979,6 @@
 
         async function handleRegister() {
             hideAlert();
-
-            // Recolectar datos del form
             var regData = collectRegisterData();
 
             if (!regData.phone || regData.phone.length < 5) {
@@ -999,30 +989,22 @@
             setButtonLoading('btnRegister', true);
 
             try {
-                // Limpiar verifier anterior si existe
                 recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
-
-                // FIX PRINCIPAL: Vincular reCAPTCHA invisible al BOTÓN de registro
                 recaptchaVerifierRegister = setupRecaptchaInvisible('btnRegister');
 
-                // Firebase enviará el SMS inmediatamente al resolver reCAPTCHA
                 confirmationResultRegister = await auth.signInWithPhoneNumber(regData.phone, recaptchaVerifierRegister);
 
-                // Mostrar sección de código OTP
                 document.getElementById('registerVerify').classList.add('active');
                 showAlert('success', 'Código enviado al celular.');
 
             } catch (err) {
                 console.error('Register SMS error:', err);
                 showAlert('error', 'Error al enviar SMS: ' + translateFirebaseError(err.code));
-
-                // Limpiar reCAPTCHA en caso de error para permitir reintento
                 recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
             }
             setButtonLoading('btnRegister', false);
         }
 
-        // ═════════════════════════════════════════════════════════════════════
         async function verifyRegisterOTP() {
             var code = getOTPValue('regOtpGroup');
             if (code.length !== 6) { showAlert('error', 'Ingresa el código completo de 6 dígitos.'); return; }
@@ -1030,11 +1012,10 @@
             setButtonLoading('btnVerifyRegister', true);
 
             try {
-                // Step 1: Verify OTP → signs in with phone credential
                 var result = await confirmationResultRegister.confirm(code);
                 var phoneUser = result.user;
 
-                // Step 2: If email was provided, link email+password credential
+                // Link email+password credential
                 if (pendingRegData.email && pendingRegData.password) {
                     try {
                         var emailCredential = firebase.auth.EmailAuthProvider.credential(
@@ -1061,7 +1042,7 @@
                     }
                 }
 
-                // Step 3: Save user data in Firestore
+                // Save user data in Firestore
                 await db.collection('users').doc(phoneUser.uid).set({
                     name: pendingRegData.name || '',
                     phone: pendingRegData.phone || '',
@@ -1092,9 +1073,9 @@
             handleRegister();
         }
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // RECOVERY FLOW
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         async function handleRecovery() {
             hideAlert();
             var email = document.getElementById('recoveryEmail').value.trim();
@@ -1118,9 +1099,9 @@
             setButtonLoading('btnRecovery', false);
         }
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // FIREBASE ERROR TRANSLATION
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         function translateFirebaseError(code) {
             var map = {
                 'auth/invalid-phone-number': 'Número de teléfono no válido.',
@@ -1144,9 +1125,9 @@
             return map[code] || 'Error inesperado (' + code + ')';
         }
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // AUTH STATE OBSERVER
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         auth.onAuthStateChanged(function(user) {
             if (user) {
                 console.log('👤 User detected:', user.uid);
@@ -1158,12 +1139,12 @@
             }
         });
 
-        // ═════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
         // INIT LOG
-        // ═════════════════════════════════════════════════════════════════════
-        console.log('🔐 DONTRADING Login v1.2 — Firebase Phone Auth Ready');
+        // ═════════════════════════════════════════════════════════════════════════════
+        console.log('🔐 DONTRADING Login v1.3 — Firebase: dontrading-pro');
         console.log('📱 Phone provider: Enabled');
-        console.log('🔥 Firebase plan: Blaze');
+        console.log('🔥 Firebase project: dontrading-pro (Plan Blaze)');
         console.log('🌐 Auth language: ' + auth.languageCode);
     </script>
     <!-- ═══════════════════════════════════════════════════════════════════════ -->

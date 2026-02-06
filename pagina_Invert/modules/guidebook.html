@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guidebook Module - DONTRADING (Optimizado)</title>
-    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <title>Guidebook Module - Navbar Upgrade</title>
     <style>
         /* ══════════════════════════════════════════════════════════════════════════════ */
         /*                       GUIDEBOOK MODULE - CSS INDEPENDIENTE                    */
@@ -56,7 +55,7 @@
             width: 100%;
             height: 100vh;
             display: grid;
-            grid-template-columns: 320px 1fr;  /* ← 200px → 320px */
+            grid-template-columns: 320px 1fr;
             gap: 0;
             background-color: var(--bg-primary);
             overflow: hidden;
@@ -76,44 +75,361 @@
             overflow: hidden;
         }
 
+        /* ──────────────────────────────────────────────────────────────────────────── */
+        /*  ✅ NUEVO: CONT2-HEADER CON NAVBAR DE MERCADOS                               */
+        /* ──────────────────────────────────────────────────────────────────────────── */
+
         .cont2-header {
-            padding: 16px 18px;  /* ← MÁS PADDING */
+            padding: 10px 12px 8px;
             border-bottom: 1px solid var(--border);
             background: linear-gradient(180deg, rgba(17, 24, 39, 1) 0%, rgba(13, 18, 32, 1) 100%);
+            position: relative;
+            z-index: 100;
         }
 
         .cont2-title {
-            font-size: 14px;     /* ← MÁS GRANDE */
+            font-size: 11px;
             font-weight: 700;
-            color: var(--text-primary);
+            color: var(--text-secondary);
             display: flex;
             align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── NAVBAR TABS DE MERCADOS ── */
+        .market-navbar {
+            display: flex;
+            gap: 3px;
+            width: 100%;
+        }
+
+        .market-tab {
+            flex: 1;
+            padding: 6px 2px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 9px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            letter-spacing: 0.3px;
+            position: relative;
+            white-space: nowrap;
+            line-height: 1.2;
+        }
+
+        .market-tab:hover {
+            background: rgba(245, 158, 11, 0.08);
+            border-color: var(--accent-soft);
+            color: var(--text-secondary);
+        }
+
+        .market-tab.active {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .market-tab .tab-icon {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 1px;
+        }
+
+        .market-tab .tab-label {
+            display: block;
+            font-size: 8.5px;
+        }
+
+        /* ── DROPDOWN DE ACTIVOS ── */
+        .market-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-top: 2px solid var(--accent);
+            border-radius: 0 0 10px 10px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+            opacity: 0;
+            z-index: 999;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .market-dropdown.open {
+            max-height: 380px;
+            opacity: 1;
+            overflow-y: auto;
+        }
+
+        .market-dropdown::-webkit-scrollbar { width: 3px; }
+        .market-dropdown::-webkit-scrollbar-track { background: transparent; }
+        .market-dropdown::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .dropdown-header {
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+            z-index: 1;
+        }
+
+        .dropdown-header-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .dropdown-ws-status {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .dropdown-ws-status.connected { color: var(--positive); }
+        .dropdown-ws-status.disconnected { color: var(--negative); }
+        .dropdown-ws-status.connecting { color: var(--accent); }
+
+        .ws-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            animation: reelPulse 1.5s ease-in-out infinite;
+        }
+
+        .ws-dot.connected { background: var(--positive); }
+        .ws-dot.disconnected { background: var(--negative); animation: none; }
+        .ws-dot.connecting { background: var(--accent); }
+
+        /* ── ASSET ROW (cada activo en el dropdown) ── */
+        .asset-row {
+            display: flex;
+            align-items: center;
+            padding: 7px 12px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            border-bottom: 1px solid rgba(30, 41, 59, 0.4);
             gap: 8px;
         }
+
+        .asset-row:hover {
+            background: rgba(245, 158, 11, 0.06);
+        }
+
+        .asset-row:last-child {
+            border-bottom: none;
+        }
+
+        .asset-ticker {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-primary);
+            min-width: 52px;
+            letter-spacing: 0.3px;
+        }
+
+        .asset-name {
+            flex: 1;
+            font-size: 9px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .asset-price {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-primary);
+            min-width: 55px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .asset-change {
+            font-size: 9px;
+            font-weight: 700;
+            min-width: 48px;
+            text-align: right;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .asset-change.positive {
+            color: var(--positive);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .asset-change.negative {
+            color: var(--negative);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Animación de actualización en tiempo real */
+        @keyframes priceFlash {
+            0% { background: rgba(245, 158, 11, 0.15); }
+            100% { background: transparent; }
+        }
+
+        .asset-row.price-updated {
+            animation: priceFlash 0.6s ease-out;
+        }
+
+        /* ── REEL SELECTOR MODAL ── */
+        .reel-selector-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .reel-selector-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .reel-selector-modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            min-width: 280px;
+            max-width: 320px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            transform: scale(0.9);
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .reel-selector-overlay.visible .reel-selector-modal {
+            transform: scale(1);
+        }
+
+        .reel-selector-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            text-align: center;
+        }
+
+        .reel-selector-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .reel-selector-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .reel-selector-btn {
+            padding: 12px 10px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .reel-selector-btn:hover {
+            border-color: var(--accent);
+            background: rgba(245, 158, 11, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .reel-selector-btn .btn-slot-label {
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .reel-selector-btn .btn-slot-symbol {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .reel-selector-btn .btn-slot-price {
+            font-size: 10px;
+            margin-top: 2px;
+        }
+
+        .reel-selector-btn .btn-slot-price.positive { color: var(--positive); }
+        .reel-selector-btn .btn-slot-price.negative { color: var(--negative); }
+
+        .reel-selector-cancel {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-muted);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .reel-selector-cancel:hover {
+            color: var(--negative);
+            border-color: var(--negative);
+        }
+
+        /* ──────────────────────────────────────────────────────────────────────────── */
+        /*                            GRÁFICAS PEQUEÑAS (REELS) - ORIGINAL               */
+        /* ──────────────────────────────────────────────────────────────────────────── */
 
         .cont2-reels-list {
             flex: 1;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            padding: 16px;       /* ← MÁS PADDING */
-            gap: 16px;          /* ← MÁS ESPACIO */
+            padding: 16px;
+            gap: 16px;
         }
 
         .cont2-reels-list::-webkit-scrollbar { width: 4px; }
         .cont2-reels-list::-webkit-scrollbar-track { background: transparent; }
         .cont2-reels-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-        /* ──────────────────────────────────────────────────────────────────────────── */
-        /*                            GRÁFICAS PEQUEÑAS (REELS)                          */
-        /* ──────────────────────────────────────────────────────────────────────────── */
-
         .reel-small {
             background-color: var(--bg-primary);
             border: 2px solid var(--border);
             border-radius: 12px;
-            padding: 16px;       /* ← MÁS PADDING */
-            min-height: 160px;   /* ← AGREGAR ALTURA MÍNIMA */
+            padding: 16px;
+            min-height: 160px;
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
@@ -160,7 +476,6 @@
         .reel-hint { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); font-size: 8px; color: var(--text-muted); opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
         .reel-small:hover .reel-hint { opacity: 0.7; }
         
-        /* AGREGAR ESTAS CLASES NUEVAS */
         .reel-small.active {
             border-color: var(--accent);
             background-color: rgba(245, 158, 11, 0.08);
@@ -183,10 +498,6 @@
             background-color: var(--bg-primary);
         }
 
-        /* ──────────────────────────────────────────────────────────────────────────── */
-        /*                          SECCIÓN DE GRÁFICA GRANDE                            */
-        /* ──────────────────────────────────────────────────────────────────────────── */
-
         .cont3-chart-section {
             display: flex;
             flex-direction: column;
@@ -205,10 +516,6 @@
         .main-reel-change { font-size: 16px; font-weight: 600; }
         .main-reel-change.positive { color: var(--positive); }
         .main-reel-change.negative { color: var(--negative); }
-
-        /* ──────────────────────────────────────────────────────────────────────────── */
-        /*                           MENÚ INTERNO DE GRÁFICA                             */
-        /* ──────────────────────────────────────────────────────────────────────────── */
 
         .chart-internal-menu {
             display: flex;
@@ -239,10 +546,6 @@
         .chart-menu-btn.active { background: var(--accent); color: var(--bg-primary); font-weight: 700; }
         .chart-menu-divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
 
-        /* ──────────────────────────────────────────────────────────────────────────── */
-        /*                            CANVAS DE GRÁFICA GRANDE                           */
-        /* ──────────────────────────────────────────────────────────────────────────── */
-
         .main-chart-container {
             flex: 1;
             border: 1px solid var(--border);
@@ -259,50 +562,35 @@
         .ws-status-badge.connected { background-color: rgba(34, 197, 94, 0.15); color: var(--positive); }
         .ws-status-dot { width: 5px; height: 5px; border-radius: 50%; background-color: var(--positive); animation: reelPulse 1.5s ease-in-out infinite; }
 
-        /* ══════════════════════════════════════════════════════════════════════════════ */
-        /*                              SECCIÓN DE CHAT                                  */
-        /* ══════════════════════════════════════════════════════════════════════════════ */
-
+        /* ── CHAT (ORIGINAL) ── */
         .cont3-chat-section { display: flex; flex-direction: column; height: 100%; background-color: var(--bg-sidebar); overflow: hidden; }
-
         .reel-chat-header { padding: 14px 16px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, rgba(13, 18, 32, 1) 0%, rgba(10, 14, 23, 1) 100%); flex-shrink: 0; }
         .reel-chat-title { font-size: 14px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
         .reel-chat-subtitle { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
         .chat-online-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--positive); animation: reelPulse 1.5s ease-in-out infinite; }
-
         .reel-chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
         .reel-chat-messages::-webkit-scrollbar { width: 4px; }
         .reel-chat-messages::-webkit-scrollbar-track { background: transparent; }
         .reel-chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
         .chat-message { display: flex; gap: 10px; animation: chatMsgFadeIn 0.3s ease; }
         @keyframes chatMsgFadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
         .chat-msg-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
         .chat-msg-content { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
         .chat-msg-user { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
         .chat-msg-text { font-size: 12px; color: var(--text-primary); line-height: 1.4; word-wrap: break-word; }
-
         .reel-chat-input-area { padding: 12px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg-card); }
         .reel-chat-input-box { display: flex; gap: 8px; background-color: var(--bg-primary); border: 1px solid var(--border); border-radius: 20px; padding: 6px 10px; transition: border-color 0.2s; }
         .reel-chat-input-box:focus-within { border-color: var(--accent); }
         .reel-chat-input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 12px; min-width: 0; }
         .reel-chat-input::placeholder { color: var(--text-muted); }
-
         .reel-chat-send { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #2962ff, #1e4bd8); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; flex-shrink: 0; }
         .reel-chat-send:hover { transform: scale(1.1); }
 
-        /* ✅ NUEVO: Clases para ocultar elementos dinámicamente */
         .hidden { display: none !important; }
-        
-        /* ✅ NUEVO: Loading state para datos dinámicos */
-        .loading { 
-            opacity: 0.5; 
-            pointer-events: none; 
-        }
+        .loading { opacity: 0.5; pointer-events: none; }
 
         /* ══════════════════════════════════════════════════════════════════════════════ */
         /*                              RESPONSIVE DESIGN                                */
@@ -319,25 +607,50 @@
             .cont3-chat-section { display: none; }
         }
     </style>
-    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 </head>
 <body>
-    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
-    <!-- ✅ NUEVO: ESTRUCTURA HTML ESTÁTICA (ya no se genera en JavaScript)         -->
-    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+
     <div class="guidebook-container">
+
         <!-- ═══════════════════════════════════════════════════════════════════════ -->
-        <!-- MENU DE ACTIVOS COPRREGIDO                                      -->
+        <!-- CONT 2: COLUMNA IZQUIERDA - REELS + NAVBAR DE MERCADOS                -->
         <!-- ═══════════════════════════════════════════════════════════════════════ -->
         <div class="cont2-reels-column">
+
+            <!-- ✅ NUEVO: HEADER CON NAVBAR DE MERCADOS -->
             <div class="cont2-header">
                 <span class="cont2-title">📊 Reels en Vivo</span>
+
+                <!-- NAVBAR DE MERCADOS -->
+                <div class="market-navbar">
+                    <div class="market-tab" data-market="dow" onclick="toggleMarketDropdown('dow')">
+                        <span class="tab-icon">🏛️</span>
+                        <span class="tab-label">DOW</span>
+                    </div>
+                    <div class="market-tab" data-market="nasdaq" onclick="toggleMarketDropdown('nasdaq')">
+                        <span class="tab-icon">💻</span>
+                        <span class="tab-label">NDQ</span>
+                    </div>
+                    <div class="market-tab" data-market="sp500" onclick="toggleMarketDropdown('sp500')">
+                        <span class="tab-icon">📈</span>
+                        <span class="tab-label">S&P</span>
+                    </div>
+                    <div class="market-tab" data-market="forex" onclick="toggleMarketDropdown('forex')">
+                        <span class="tab-icon">💱</span>
+                        <span class="tab-label">FX</span>
+                    </div>
+                    <div class="market-tab" data-market="crypto" onclick="toggleMarketDropdown('crypto')">
+                        <span class="tab-icon">₿</span>
+                        <span class="tab-label">CRY</span>
+                    </div>
+                </div>
+
+                <!-- DROPDOWN CONTENEDOR (se llena dinámicamente) -->
+                <div class="market-dropdown" id="market-dropdown"></div>
             </div>
-            <!-- ═══════════════════════════════════════════════════════════════════════ -->
-            <!-- COLUMNA IZQUIERDA: REELS PEQUEÑOS                                      -->
-            <!-- ═══════════════════════════════════════════════════════════════════════ -->            
+
+            <!-- REELS PEQUEÑOS (ORIGINAL, sin cambios) -->
             <div class="cont2-reels-list">
-                <!-- ✅ REEL 1: AAPL (Plantilla HTML estática) -->
                 <div class="reel-small" data-reel-id="reel-1" data-symbol="AAPL" draggable="true">
                     <div class="reel-small-header">
                         <div class="reel-symbol-info">
@@ -359,7 +672,6 @@
                     <span class="reel-hint">Click para intercambiar</span>
                 </div>
 
-                <!-- ✅ REEL 2: NVDA (Plantilla HTML estática) -->
                 <div class="reel-small" data-reel-id="reel-2" data-symbol="NVDA" draggable="true">
                     <div class="reel-small-header">
                         <div class="reel-symbol-info">
@@ -381,7 +693,6 @@
                     <span class="reel-hint">Click para intercambiar</span>
                 </div>
 
-                <!-- ✅ REEL 3: TSLA (Plantilla HTML estática) -->
                 <div class="reel-small" data-reel-id="reel-3" data-symbol="TSLA" draggable="true">
                     <div class="reel-small-header">
                         <div class="reel-symbol-info">
@@ -404,19 +715,17 @@
                 </div>
             </div>
         </div>
+
         <!-- ═══════════════════════════════════════════════════════════════════════ -->
-        <!-- ÁREA PRINCIPAL: GRÁFICA GRANDE + CHAT                                  -->
+        <!-- CONT 3: GRÁFICA GRANDE + CHAT (ORIGINAL, sin cambios)                 -->
         <!-- ═══════════════════════════════════════════════════════════════════════ -->
         <div class="cont3-main-area">
-            <!-- ───────────────────────────────────────────────────────────────────── -->
-            <!-- SECCIÓN DE GRÁFICA GRANDE                                           -->
-            <!-- ───────────────────────────────────────────────────────────────────── -->
             <div class="cont3-chart-section">
                 <div class="main-reel-header">
                     <div class="main-reel-info">
                         <div class="main-reel-symbol-block">
-                            <div class="main-reel-symbol" data-main-symbol>MSFT</div>
-                            <div class="main-reel-name" data-main-name>Microsoft Corp.</div>
+                            <span class="main-reel-symbol" data-main-symbol>MSFT</span>
+                            <span class="main-reel-name" data-main-name>Microsoft Corp.</span>
                         </div>
                         <div class="main-reel-price-block">
                             <span class="main-reel-price" data-main-price>$415.20</span>
@@ -424,33 +733,25 @@
                         </div>
                     </div>
                 </div>
-                
-                <!-- ✅ MENÚ ESTÁTICO -->
                 <div class="chart-internal-menu">
-                    <button class="chart-menu-btn active" data-interval="1m">1M</button>
-                    <button class="chart-menu-btn" data-interval="5m">5M</button>
-                    <button class="chart-menu-btn" data-interval="15m">15M</button>
+                    <button class="chart-menu-btn active" data-interval="1m">1m</button>
+                    <button class="chart-menu-btn" data-interval="5m">5m</button>
+                    <button class="chart-menu-btn" data-interval="15m">15m</button>
                     <button class="chart-menu-btn" data-interval="1h">1H</button>
                     <button class="chart-menu-btn" data-interval="1d">1D</button>
-                    <div class="chart-menu-divider"></div>
-                    <button class="chart-menu-btn">📈 Indicadores</button>
-                    <button class="chart-menu-btn">✏️ Dibujar</button>
-                    <button class="chart-menu-btn">⚙️</button>
+                    <span class="chart-menu-divider"></span>
+                    <button class="chart-menu-btn" data-interval="1w">1W</button>
+                    <button class="chart-menu-btn" data-interval="1M">1M</button>
                 </div>
-                
-                <!-- ✅ CANVAS ESTÁTICO -->
                 <div class="main-chart-container">
                     <canvas id="main-chart"></canvas>
                     <div class="ws-status-badge connected">
                         <span class="ws-status-dot"></span>
-                        <span>Conectado</span>
+                        <span>En Vivo</span>
                     </div>
                 </div>
             </div>
 
-            <!-- ───────────────────────────────────────────────────────────────────── -->
-            <!-- SECCIÓN DE CHAT                                                     -->
-            <!-- ───────────────────────────────────────────────────────────────────── -->
             <div class="cont3-chat-section">
                 <div class="reel-chat-header">
                     <div class="reel-chat-title" data-chat-title>💬 Chat de MSFT</div>
@@ -458,37 +759,142 @@
                         <span class="chat-online-dot"></span>4 mensajes activos
                     </div>
                 </div>
-                
-                <!-- ✅ ÁREA DE MENSAJES (se llena dinámicamente) -->
                 <div class="reel-chat-messages" data-chat-messages></div>
-                
-                <!-- ✅ ÁREA DE INPUT ESTÁTICA -->
                 <div class="reel-chat-input-area">
                     <div class="reel-chat-input-box">
-                        <input type="text" class="reel-chat-input" data-chat-input placeholder="Escribe sobre MSFT...">
+                        <input class="reel-chat-input" data-chat-input placeholder="Escribe sobre MSFT..." type="text">
                         <button class="reel-chat-send" data-chat-send>
-                            <svg width="12" height="12" fill="white" viewBox="0 0 24 24">
-                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                            </svg>
+                            <svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
     <!-- ═══════════════════════════════════════════════════════════════════════════ -->
-    <!-- ✅ JAVASCRIPT OPTIMIZADO (50% menos código)                                -->
+    <!-- ✅ REEL SELECTOR MODAL (elegir en cuál reel colocar el activo)             -->
     <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="reel-selector-overlay" id="reel-selector-overlay">
+        <div class="reel-selector-modal">
+            <div class="reel-selector-title" id="reel-selector-title">Colocar AAPL</div>
+            <div class="reel-selector-subtitle">Elige en cuál reel mostrar esta gráfica</div>
+            <div class="reel-selector-options" id="reel-selector-options"></div>
+            <button class="reel-selector-cancel" onclick="closeReelSelector()">Cancelar</button>
+        </div>
+    </div>
+
     <script>
         // ═════════════════════════════════════════════════════════════════════════
-        // MÓDULO GUIDEBOOK - JAVASCRIPT OPTIMIZADO 
-        // ✅ 50% MENOS CÓDIGO: No más renderizado HTML
-        // ✅ MISMA FUNCIONALIDAD: Todas las características intactas
-        // ✅ MEJOR PERFORMANCE: DOM estático + actualizaciones selectivas
+        // MÓDULO GUIDEBOOK - JAVASCRIPT OPTIMIZADO + NAVBAR DE MERCADOS
         // ═════════════════════════════════════════════════════════════════════════
 
         // ─────────────────────────────────────────────────────────────────────────
-        // CONFIGURACIÓN DE REELS (sin cambios)
+        // POLYGON API CONFIG
+        // ─────────────────────────────────────────────────────────────────────────
+        var API_KEY = 'Q3I6b14c8HL2l_A7faplgnuMTXekxCUU';
+        var stocksSocket = null;
+        var cryptoSocket = null;
+        var forexSocket = null;
+        var reconnectAttempts = { stocks: 0, crypto: 0, forex: 0 };
+        var lastMessageTime = Date.now();
+        var tradeCount = { stocks: 0, crypto: 0, forex: 0 };
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // CATÁLOGO DE ACTIVOS POR MERCADO (Top 10 cada uno)
+        // ─────────────────────────────────────────────────────────────────────────
+        var MARKET_ASSETS = {
+            dow: {
+                label: 'DOW JONES 30',
+                type: 'stocks',
+                assets: [
+                    { ticker: 'AAPL', name: 'Apple Inc.', price: 0, change: 0 },
+                    { ticker: 'MSFT', name: 'Microsoft', price: 0, change: 0 },
+                    { ticker: 'UNH', name: 'UnitedHealth', price: 0, change: 0 },
+                    { ticker: 'GS', name: 'Goldman Sachs', price: 0, change: 0 },
+                    { ticker: 'HD', name: 'Home Depot', price: 0, change: 0 },
+                    { ticker: 'AMGN', name: 'Amgen Inc.', price: 0, change: 0 },
+                    { ticker: 'MCD', name: "McDonald's", price: 0, change: 0 },
+                    { ticker: 'V', name: 'Visa Inc.', price: 0, change: 0 },
+                    { ticker: 'JPM', name: 'JPMorgan Chase', price: 0, change: 0 },
+                    { ticker: 'CAT', name: 'Caterpillar', price: 0, change: 0 }
+                ]
+            },
+            nasdaq: {
+                label: 'NASDAQ TOP 10',
+                type: 'stocks',
+                assets: [
+                    { ticker: 'NVDA', name: 'NVIDIA Corp.', price: 0, change: 0 },
+                    { ticker: 'AAPL', name: 'Apple Inc.', price: 0, change: 0 },
+                    { ticker: 'MSFT', name: 'Microsoft', price: 0, change: 0 },
+                    { ticker: 'AMZN', name: 'Amazon', price: 0, change: 0 },
+                    { ticker: 'META', name: 'Meta Platforms', price: 0, change: 0 },
+                    { ticker: 'GOOGL', name: 'Alphabet', price: 0, change: 0 },
+                    { ticker: 'TSLA', name: 'Tesla Inc.', price: 0, change: 0 },
+                    { ticker: 'AVGO', name: 'Broadcom', price: 0, change: 0 },
+                    { ticker: 'COST', name: 'Costco', price: 0, change: 0 },
+                    { ticker: 'NFLX', name: 'Netflix', price: 0, change: 0 }
+                ]
+            },
+            sp500: {
+                label: 'S&P 500 TOP 10',
+                type: 'stocks',
+                assets: [
+                    { ticker: 'AAPL', name: 'Apple Inc.', price: 0, change: 0 },
+                    { ticker: 'MSFT', name: 'Microsoft', price: 0, change: 0 },
+                    { ticker: 'NVDA', name: 'NVIDIA Corp.', price: 0, change: 0 },
+                    { ticker: 'AMZN', name: 'Amazon', price: 0, change: 0 },
+                    { ticker: 'GOOGL', name: 'Alphabet', price: 0, change: 0 },
+                    { ticker: 'META', name: 'Meta Platforms', price: 0, change: 0 },
+                    { ticker: 'BRK.B', name: 'Berkshire B', price: 0, change: 0 },
+                    { ticker: 'LLY', name: 'Eli Lilly', price: 0, change: 0 },
+                    { ticker: 'UNH', name: 'UnitedHealth', price: 0, change: 0 },
+                    { ticker: 'JPM', name: 'JPMorgan', price: 0, change: 0 }
+                ]
+            },
+            forex: {
+                label: 'FOREX MAJORS',
+                type: 'forex',
+                assets: [
+                    { ticker: 'C:EURUSD', name: 'EUR/USD', price: 0, change: 0, display: 'EUR/USD' },
+                    { ticker: 'C:GBPUSD', name: 'GBP/USD', price: 0, change: 0, display: 'GBP/USD' },
+                    { ticker: 'C:USDJPY', name: 'USD/JPY', price: 0, change: 0, display: 'USD/JPY' },
+                    { ticker: 'C:USDCHF', name: 'USD/CHF', price: 0, change: 0, display: 'USD/CHF' },
+                    { ticker: 'C:AUDUSD', name: 'AUD/USD', price: 0, change: 0, display: 'AUD/USD' },
+                    { ticker: 'C:USDCAD', name: 'USD/CAD', price: 0, change: 0, display: 'USD/CAD' },
+                    { ticker: 'C:NZDUSD', name: 'NZD/USD', price: 0, change: 0, display: 'NZD/USD' },
+                    { ticker: 'C:EURGBP', name: 'EUR/GBP', price: 0, change: 0, display: 'EUR/GBP' },
+                    { ticker: 'C:EURJPY', name: 'EUR/JPY', price: 0, change: 0, display: 'EUR/JPY' },
+                    { ticker: 'C:GBPJPY', name: 'GBP/JPY', price: 0, change: 0, display: 'GBP/JPY' }
+                ]
+            },
+            crypto: {
+                label: 'CRYPTO TOP 10',
+                type: 'crypto',
+                assets: [
+                    { ticker: 'X:BTCUSD', name: 'Bitcoin', price: 0, change: 0, display: 'BTC' },
+                    { ticker: 'X:ETHUSD', name: 'Ethereum', price: 0, change: 0, display: 'ETH' },
+                    { ticker: 'X:SOLUSD', name: 'Solana', price: 0, change: 0, display: 'SOL' },
+                    { ticker: 'X:XRPUSD', name: 'XRP', price: 0, change: 0, display: 'XRP' },
+                    { ticker: 'X:ADAUSD', name: 'Cardano', price: 0, change: 0, display: 'ADA' },
+                    { ticker: 'X:DOGEUSD', name: 'Dogecoin', price: 0, change: 0, display: 'DOGE' },
+                    { ticker: 'X:AVAXUSD', name: 'Avalanche', price: 0, change: 0, display: 'AVAX' },
+                    { ticker: 'X:DOTUSD', name: 'Polkadot', price: 0, change: 0, display: 'DOT' },
+                    { ticker: 'X:MATICUSD', name: 'Polygon', price: 0, change: 0, display: 'MATIC' },
+                    { ticker: 'X:LINKUSD', name: 'Chainlink', price: 0, change: 0, display: 'LINK' }
+                ]
+            }
+        };
+
+        // Estado del navbar
+        var navbarState = {
+            activeDropdown: null,
+            pendingAsset: null,    // activo seleccionado pendiente de asignar a un reel
+            wsStatus: { stocks: 'disconnected', crypto: 'disconnected', forex: 'disconnected' }
+        };
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // CONFIGURACIÓN DE REELS (original)
         // ─────────────────────────────────────────────────────────────────────────
         var REELS_CONFIG = [
             { id: 'reel-1', symbol: 'AAPL', name: 'Apple Inc.', color: '#3b82f6', price: 178.52, change: 2.34, isPositive: true },
@@ -497,9 +903,6 @@
             { id: 'reel-4', symbol: 'MSFT', name: 'Microsoft Corp.', color: '#f59e0b', price: 415.20, change: 1.89, isPositive: true }
         ];
 
-        // ─────────────────────────────────────────────────────────────────────────
-        // ESTADO DEL MÓDULO (sin cambios)
-        // ─────────────────────────────────────────────────────────────────────────
         var guidebookState = {
             activeReelId: 'reel-4',
             smallReels: ['reel-1', 'reel-2', 'reel-3'],
@@ -510,7 +913,7 @@
         };
 
         // ─────────────────────────────────────────────────────────────────────────
-        // UTILIDADES (sin cambios)
+        // UTILIDADES (original)
         // ─────────────────────────────────────────────────────────────────────────
         function findReelById(id) {
             for (var i = 0; i < REELS_CONFIG.length; i++) {
@@ -524,31 +927,485 @@
             return colors[Math.floor(Math.random() * colors.length)];
         }
 
-        // ─────────────────────────────────────────────────────────────────────────
-        // ✅ NUEVO: FUNCIONES DE ACTUALIZACIÓN SELECTIVA (no más renderizado completo)
-        // ─────────────────────────────────────────────────────────────────────────
+        // ═════════════════════════════════════════════════════════════════════════
+        // ✅ NUEVO: NAVBAR DROPDOWN SYSTEM
+        // ═════════════════════════════════════════════════════════════════════════
 
-        // Actualiza solo los datos dinámicos de un reel (precio, cambio, clase activa)
+        function toggleMarketDropdown(marketKey) {
+            var dropdown = document.getElementById('market-dropdown');
+            var tabs = document.querySelectorAll('.market-tab');
+
+            // Si ya está abierto este mercado, cerrar
+            if (navbarState.activeDropdown === marketKey) {
+                closeDropdown();
+                return;
+            }
+
+            // Cerrar anterior y abrir nuevo
+            navbarState.activeDropdown = marketKey;
+
+            // Activar tab correcto
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.toggle('active', tabs[i].getAttribute('data-market') === marketKey);
+            }
+
+            // Generar contenido del dropdown
+            var market = MARKET_ASSETS[marketKey];
+            var wsType = market.type;
+            var statusClass = navbarState.wsStatus[wsType] || 'disconnected';
+            var statusLabel = statusClass === 'connected' ? 'EN VIVO' : statusClass === 'connecting' ? 'CONECTANDO...' : 'DESCONECTADO';
+
+            var html = '<div class="dropdown-header">' +
+                '<span class="dropdown-header-title">' + market.label + '</span>' +
+                '<span class="dropdown-ws-status ' + statusClass + '">' +
+                    '<span class="ws-dot ' + statusClass + '"></span>' +
+                    statusLabel +
+                '</span>' +
+            '</div>';
+
+            for (var j = 0; j < market.assets.length; j++) {
+                var asset = market.assets[j];
+                var displayTicker = asset.display || asset.ticker;
+                var priceText = asset.price > 0 ? '$' + asset.price.toFixed(2) : '--';
+                var changeText = asset.price > 0 ? ((asset.change >= 0 ? '+' : '') + asset.change.toFixed(2) + '%') : '--';
+                var changeClass = asset.change >= 0 ? 'positive' : 'negative';
+
+                html += '<div class="asset-row" data-asset-ticker="' + asset.ticker + '" data-market="' + marketKey + '" onclick="onAssetClick(\'' + marketKey + '\', ' + j + ')">' +
+                    '<span class="asset-ticker">' + displayTicker + '</span>' +
+                    '<span class="asset-name">' + asset.name + '</span>' +
+                    '<span class="asset-price" data-nav-price="' + asset.ticker + '">' + priceText + '</span>' +
+                    '<span class="asset-change ' + changeClass + '" data-nav-change="' + asset.ticker + '">' + changeText + '</span>' +
+                '</div>';
+            }
+
+            dropdown.innerHTML = html;
+            dropdown.classList.add('open');
+
+            // Suscribir a WebSocket si no está conectado
+            ensureWebSocketConnection(wsType);
+        }
+
+        function closeDropdown() {
+            var dropdown = document.getElementById('market-dropdown');
+            dropdown.classList.remove('open');
+            navbarState.activeDropdown = null;
+
+            var tabs = document.querySelectorAll('.market-tab');
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('active');
+            }
+        }
+
+        // Cerrar dropdown al hacer click fuera
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.cont2-header')) {
+                closeDropdown();
+            }
+        });
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // ✅ NUEVO: REEL SELECTOR (elegir en cuál reel colocar)
+        // ═════════════════════════════════════════════════════════════════════════
+
+        function onAssetClick(marketKey, assetIndex) {
+            var market = MARKET_ASSETS[marketKey];
+            var asset = market.assets[assetIndex];
+
+            navbarState.pendingAsset = {
+                marketKey: marketKey,
+                assetIndex: assetIndex,
+                ticker: asset.ticker,
+                displayTicker: asset.display || asset.ticker,
+                name: asset.name,
+                type: market.type
+            };
+
+            showReelSelector(asset);
+        }
+
+        function showReelSelector(asset) {
+            var overlay = document.getElementById('reel-selector-overlay');
+            var title = document.getElementById('reel-selector-title');
+            var options = document.getElementById('reel-selector-options');
+
+            title.textContent = 'Colocar ' + (asset.display || asset.ticker);
+
+            var html = '';
+            for (var i = 0; i < REELS_CONFIG.length; i++) {
+                var reel = REELS_CONFIG[i];
+                var slotLabel = reel.id === guidebookState.activeReelId ? 'PRINCIPAL' : 'SLOT ' + (i + 1);
+                var changeClass = reel.isPositive ? 'positive' : 'negative';
+                var changeText = (reel.isPositive ? '+' : '') + reel.change.toFixed(2) + '%';
+
+                html += '<div class="reel-selector-btn" onclick="assignToReel(\'' + reel.id + '\')">' +
+                    '<div class="btn-slot-label">' + slotLabel + '</div>' +
+                    '<div class="btn-slot-symbol">' + reel.symbol + '</div>' +
+                    '<div class="btn-slot-price ' + changeClass + '">' + changeText + '</div>' +
+                '</div>';
+            }
+
+            options.innerHTML = html;
+            overlay.classList.add('visible');
+        }
+
+        function closeReelSelector() {
+            document.getElementById('reel-selector-overlay').classList.remove('visible');
+            navbarState.pendingAsset = null;
+        }
+
+        function assignToReel(reelId) {
+            if (!navbarState.pendingAsset) return;
+
+            var pending = navbarState.pendingAsset;
+            var reel = findReelById(reelId);
+            if (!reel) return;
+
+            // Actualizar la configuración del reel
+            reel.symbol = pending.displayTicker;
+            reel.name = pending.name;
+            reel.color = getRandomColor();
+
+            // Generar nuevo historial de precios para el nuevo activo
+            guidebookState.priceHistory[reelId] = generatePriceHistory(reel.price || 100, 50);
+            guidebookState.chatMessages[reelId] = generateInitialChatMessages(pending.displayTicker);
+
+            // Actualizar el atributo data-symbol del reel en el DOM
+            var reelEl = document.querySelector('[data-reel-id="' + reelId + '"]');
+            if (reelEl) {
+                reelEl.setAttribute('data-symbol', pending.ticker);
+                var symbolEl = reelEl.querySelector('.reel-symbol');
+                var nameEl = reelEl.querySelector('.reel-name');
+                if (symbolEl) symbolEl.textContent = pending.displayTicker;
+                if (nameEl) nameEl.textContent = pending.name;
+            }
+
+            // Suscribir este ticker al WebSocket
+            subscribeToTicker(pending.type, pending.ticker);
+
+            // Si es el reel activo, actualizar la vista principal
+            if (reelId === guidebookState.activeReelId) {
+                switchToReel(reelId);
+            }
+
+            // Redibujar gráficas
+            drawAllCharts();
+
+            closeReelSelector();
+            closeDropdown();
+
+            console.log('[Navbar] Asignado ' + pending.displayTicker + ' → ' + reelId);
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // ✅ NUEVO: POLYGON WEBSOCKET REAL-TIME
+        // ═════════════════════════════════════════════════════════════════════════
+
+        function ensureWebSocketConnection(type) {
+            if (type === 'stocks' && (!stocksSocket || stocksSocket.readyState > 1)) {
+                connectWebSocket('stocks');
+            } else if (type === 'crypto' && (!cryptoSocket || cryptoSocket.readyState > 1)) {
+                connectWebSocket('crypto');
+            } else if (type === 'forex' && (!forexSocket || forexSocket.readyState > 1)) {
+                connectWebSocket('forex');
+            }
+        }
+
+        function connectWebSocket(type) {
+            var urls = {
+                stocks: 'wss://socket.polygon.io/stocks',
+                crypto: 'wss://socket.polygon.io/crypto',
+                forex: 'wss://socket.polygon.io/forex'
+            };
+
+            navbarState.wsStatus[type] = 'connecting';
+            updateDropdownWsStatus(type);
+
+            console.log('[WS] Conectando a ' + type + '...');
+
+            var ws = new WebSocket(urls[type]);
+
+            ws.onopen = function() {
+                console.log('[WS] Conexión abierta: ' + type);
+                // Autenticar
+                ws.send(JSON.stringify({ action: 'auth', params: API_KEY }));
+            };
+
+            ws.onmessage = function(event) {
+                var data = JSON.parse(event.data);
+
+                if (Array.isArray(data)) {
+                    for (var i = 0; i < data.length; i++) {
+                        var msg = data[i];
+
+                        // Respuesta de autenticación
+                        if (msg.ev === 'status') {
+                            if (msg.status === 'auth_success') {
+                                console.log('[WS] Autenticado: ' + type);
+                                navbarState.wsStatus[type] = 'connected';
+                                reconnectAttempts[type] = 0;
+                                updateDropdownWsStatus(type);
+                                // Suscribir todos los tickers de este tipo
+                                subscribeAllTickers(type);
+                            } else if (msg.status === 'auth_failed') {
+                                console.error('[WS] Auth falló: ' + type);
+                                navbarState.wsStatus[type] = 'disconnected';
+                                updateDropdownWsStatus(type);
+                            }
+                        }
+
+                        // Trades de stocks (ev: "T")
+                        if (msg.ev === 'T' && type === 'stocks') {
+                            handleStockTrade(msg);
+                        }
+
+                        // Trades de crypto (ev: "XT")
+                        if (msg.ev === 'XT' && type === 'crypto') {
+                            handleCryptoTrade(msg);
+                        }
+
+                        // Quotes de forex (ev: "C")
+                        if (msg.ev === 'C' && type === 'forex') {
+                            handleForexQuote(msg);
+                        }
+
+                        // Aggregates (ev: "AM" / "A") para stocks
+                        if ((msg.ev === 'AM' || msg.ev === 'A') && type === 'stocks') {
+                            handleStockAggregate(msg);
+                        }
+                    }
+                }
+
+                lastMessageTime = Date.now();
+                tradeCount[type]++;
+            };
+
+            ws.onclose = function() {
+                console.log('[WS] Conexión cerrada: ' + type);
+                navbarState.wsStatus[type] = 'disconnected';
+                updateDropdownWsStatus(type);
+
+                // Reconectar con backoff
+                if (reconnectAttempts[type] < 5) {
+                    var delay = Math.min(1000 * Math.pow(2, reconnectAttempts[type]), 30000);
+                    reconnectAttempts[type]++;
+                    console.log('[WS] Reconectando ' + type + ' en ' + delay + 'ms...');
+                    setTimeout(function() { connectWebSocket(type); }, delay);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('[WS] Error en ' + type + ':', error);
+            };
+
+            // Guardar referencia
+            if (type === 'stocks') stocksSocket = ws;
+            if (type === 'crypto') cryptoSocket = ws;
+            if (type === 'forex') forexSocket = ws;
+        }
+
+        function subscribeAllTickers(type) {
+            var tickers = [];
+            var markets = Object.keys(MARKET_ASSETS);
+
+            for (var i = 0; i < markets.length; i++) {
+                var market = MARKET_ASSETS[markets[i]];
+                if (market.type === type) {
+                    for (var j = 0; j < market.assets.length; j++) {
+                        var ticker = market.assets[j].ticker;
+                        if (tickers.indexOf(ticker) === -1) {
+                            tickers.push(ticker);
+                        }
+                    }
+                }
+            }
+
+            if (tickers.length === 0) return;
+
+            var ws = type === 'stocks' ? stocksSocket : type === 'crypto' ? cryptoSocket : forexSocket;
+            if (!ws || ws.readyState !== 1) return;
+
+            // Suscribir a trades y aggregates
+            if (type === 'stocks') {
+                var tradeSubs = tickers.map(function(t) { return 'T.' + t; }).join(',');
+                var aggSubs = tickers.map(function(t) { return 'AM.' + t; }).join(',');
+                ws.send(JSON.stringify({ action: 'subscribe', params: tradeSubs + ',' + aggSubs }));
+                console.log('[WS] Suscrito a stocks:', tickers);
+            } else if (type === 'crypto') {
+                var cryptoSubs = tickers.map(function(t) { return 'XT.' + t; }).join(',');
+                ws.send(JSON.stringify({ action: 'subscribe', params: cryptoSubs }));
+                console.log('[WS] Suscrito a crypto:', tickers);
+            } else if (type === 'forex') {
+                var fxSubs = tickers.map(function(t) { return 'C.' + t; }).join(',');
+                ws.send(JSON.stringify({ action: 'subscribe', params: fxSubs }));
+                console.log('[WS] Suscrito a forex:', tickers);
+            }
+        }
+
+        function subscribeToTicker(type, ticker) {
+            var ws = type === 'stocks' ? stocksSocket : type === 'crypto' ? cryptoSocket : forexSocket;
+            if (!ws || ws.readyState !== 1) return;
+
+            var prefix = type === 'stocks' ? 'T.' : type === 'crypto' ? 'XT.' : 'C.';
+            ws.send(JSON.stringify({ action: 'subscribe', params: prefix + ticker }));
+
+            if (type === 'stocks') {
+                ws.send(JSON.stringify({ action: 'subscribe', params: 'AM.' + ticker }));
+            }
+
+            console.log('[WS] Suscrito a nuevo ticker:', ticker);
+        }
+
+        // ── Handlers de datos en tiempo real ──
+
+        function handleStockTrade(msg) {
+            // msg.sym = ticker, msg.p = price, msg.s = size
+            updateAssetPrice(msg.sym, msg.p, 'stocks');
+            updateReelIfMatches(msg.sym, msg.p);
+        }
+
+        function handleStockAggregate(msg) {
+            // msg.sym = ticker, msg.c = close, msg.o = open
+            if (msg.c && msg.o) {
+                var change = ((msg.c - msg.o) / msg.o) * 100;
+                updateAssetChange(msg.sym, change, 'stocks');
+            }
+        }
+
+        function handleCryptoTrade(msg) {
+            // msg.pair = ticker (e.g., "X:BTCUSD"), msg.p = price
+            var ticker = msg.pair;
+            updateAssetPrice(ticker, msg.p, 'crypto');
+            updateReelIfMatches(ticker, msg.p);
+        }
+
+        function handleForexQuote(msg) {
+            // msg.p = pair (e.g., "C:EURUSD"), msg.a = ask price
+            var ticker = msg.p;
+            updateAssetPrice(ticker, msg.a, 'forex');
+            updateReelIfMatches(ticker, msg.a);
+        }
+
+        // Actualizar precio en el catálogo y en el dropdown
+        function updateAssetPrice(ticker, price, type) {
+            var markets = Object.keys(MARKET_ASSETS);
+            for (var i = 0; i < markets.length; i++) {
+                var market = MARKET_ASSETS[markets[i]];
+                if (market.type !== type) continue;
+                for (var j = 0; j < market.assets.length; j++) {
+                    if (market.assets[j].ticker === ticker) {
+                        var oldPrice = market.assets[j].price;
+                        market.assets[j].price = price;
+
+                        // Calcular cambio si hay precio anterior
+                        if (oldPrice > 0) {
+                            market.assets[j].change = ((price - oldPrice) / oldPrice) * 100;
+                        }
+
+                        // Actualizar DOM del dropdown si está visible
+                        updateDropdownAssetDOM(ticker, market.assets[j]);
+                    }
+                }
+            }
+        }
+
+        function updateAssetChange(ticker, change, type) {
+            var markets = Object.keys(MARKET_ASSETS);
+            for (var i = 0; i < markets.length; i++) {
+                var market = MARKET_ASSETS[markets[i]];
+                if (market.type !== type) continue;
+                for (var j = 0; j < market.assets.length; j++) {
+                    if (market.assets[j].ticker === ticker) {
+                        market.assets[j].change = change;
+                        updateDropdownAssetDOM(ticker, market.assets[j]);
+                    }
+                }
+            }
+        }
+
+        // Actualizar un asset en el dropdown visible
+        function updateDropdownAssetDOM(ticker, asset) {
+            var priceEl = document.querySelector('[data-nav-price="' + ticker + '"]');
+            var changeEl = document.querySelector('[data-nav-change="' + ticker + '"]');
+            var row = document.querySelector('[data-asset-ticker="' + ticker + '"]');
+
+            if (priceEl && asset.price > 0) {
+                priceEl.textContent = '$' + asset.price.toFixed(2);
+            }
+
+            if (changeEl && asset.price > 0) {
+                var changeText = (asset.change >= 0 ? '+' : '') + asset.change.toFixed(2) + '%';
+                changeEl.textContent = changeText;
+                changeEl.className = 'asset-change ' + (asset.change >= 0 ? 'positive' : 'negative');
+            }
+
+            // Flash de actualización
+            if (row) {
+                row.classList.remove('price-updated');
+                void row.offsetWidth; // force reflow
+                row.classList.add('price-updated');
+            }
+        }
+
+        // Actualizar el reel si el ticker coincide
+        function updateReelIfMatches(ticker, price) {
+            for (var i = 0; i < REELS_CONFIG.length; i++) {
+                var reel = REELS_CONFIG[i];
+                var reelEl = document.querySelector('[data-reel-id="' + reel.id + '"]');
+                var reelTicker = reelEl ? reelEl.getAttribute('data-symbol') : '';
+
+                if (reelTicker === ticker) {
+                    reel.price = price;
+                    var history = guidebookState.priceHistory[reel.id];
+                    if (history && history.length > 0) {
+                        reel.change = ((price - history[0].price) / history[0].price) * 100;
+                        reel.isPositive = reel.change >= 0;
+                        history.push({ time: Date.now(), price: price });
+                        if (history.length > 100) history.shift();
+                    }
+
+                    updateReelData(reel.id, reel);
+                    if (reel.id === guidebookState.activeReelId) {
+                        updateMainReelData(reel);
+                    }
+                }
+            }
+        }
+
+        function updateDropdownWsStatus(type) {
+            // Solo actualizar si el dropdown activo corresponde a este tipo
+            if (!navbarState.activeDropdown) return;
+            var activeMarket = MARKET_ASSETS[navbarState.activeDropdown];
+            if (!activeMarket || activeMarket.type !== type) return;
+
+            var statusEl = document.querySelector('.dropdown-ws-status');
+            if (!statusEl) return;
+
+            var status = navbarState.wsStatus[type];
+            var label = status === 'connected' ? 'EN VIVO' : status === 'connecting' ? 'CONECTANDO...' : 'DESCONECTADO';
+            statusEl.className = 'dropdown-ws-status ' + status;
+            statusEl.innerHTML = '<span class="ws-dot ' + status + '"></span>' + label;
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // FUNCIONES DE ACTUALIZACIÓN SELECTIVA (original)
+        // ═════════════════════════════════════════════════════════════════════════
+
         function updateReelData(reelId, reel) {
             var reelEl = document.querySelector('[data-reel-id="' + reelId + '"]');
             if (!reelEl) return;
 
-            // Actualizar precio
             var priceEl = reelEl.querySelector('[data-price="' + reelId + '"]');
             if (priceEl) priceEl.textContent = '$' + reel.price.toFixed(2);
 
-            // Actualizar cambio
             var changeEl = reelEl.querySelector('[data-change="' + reelId + '"]');
             if (changeEl) {
                 changeEl.textContent = (reel.isPositive ? '+' : '') + reel.change.toFixed(2) + '%';
                 changeEl.className = 'reel-change ' + (reel.isPositive ? 'positive' : 'negative');
             }
 
-            // Actualizar clase activa
             reelEl.classList.toggle('active', reelId === guidebookState.activeReelId);
         }
 
-        // Actualiza los datos de la gráfica principal
         function updateMainReelData(reel) {
             var symbolEl = document.querySelector('[data-main-symbol]');
             if (symbolEl) symbolEl.textContent = reel.symbol;
@@ -566,7 +1423,6 @@
             }
         }
 
-        // Actualiza el header del chat
         function updateChatHeader(reel) {
             var titleEl = document.querySelector('[data-chat-title]');
             if (titleEl) titleEl.textContent = '💬 Chat de ' + reel.symbol;
@@ -578,7 +1434,6 @@
             }
         }
 
-        // Renderiza los mensajes del chat
         function updateChatMessages(reelId) {
             var messagesEl = document.querySelector('[data-chat-messages]');
             if (!messagesEl) return;
@@ -601,37 +1456,30 @@
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        // Actualiza el placeholder del input de chat
         function updateChatInput(reel) {
             var inputEl = document.querySelector('[data-chat-input]');
             if (inputEl) inputEl.placeholder = 'Escribe sobre ' + reel.symbol + '...';
         }
 
-        // ✅ FUNCIÓN PRINCIPAL: Actualiza toda la UI para un reel activo
         function switchToReel(reelId) {
             var reel = findReelById(reelId);
             if (!reel) return;
 
-            // Actualizar estado
             guidebookState.activeReelId = reelId;
-
-            // Actualizar UI selectivamente
             updateMainReelData(reel);
             updateChatHeader(reel);
             updateChatMessages(reelId);
             updateChatInput(reel);
 
-            // Actualizar clases activas de todos los reels
             for (var i = 0; i < REELS_CONFIG.length; i++) {
                 updateReelData(REELS_CONFIG[i].id, REELS_CONFIG[i]);
             }
 
-            // Redibujar canvas
             drawMainChart();
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // GENERADORES DE DATOS (sin cambios)
+        // GENERADORES DE DATOS (original)
         // ─────────────────────────────────────────────────────────────────────────
         function generatePriceHistory(basePrice, points) {
             var history = [];
@@ -653,7 +1501,7 @@
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // SIMULACIONES (simplificadas)
+        // SIMULACIONES (original + integración real-time)
         // ─────────────────────────────────────────────────────────────────────────
         function startPriceSimulation() {
             if (guidebookState.simulationInterval) clearInterval(guidebookState.simulationInterval);
@@ -662,6 +1510,8 @@
                 for (var i = 0; i < REELS_CONFIG.length; i++) {
                     var reel = REELS_CONFIG[i];
                     var history = guidebookState.priceHistory[reel.id];
+                    if (!history || history.length === 0) continue;
+
                     var lastPrice = history[history.length - 1].price;
                     var newPrice = lastPrice * (1 + (Math.random() - 0.48) * 0.006);
 
@@ -672,7 +1522,6 @@
                     reel.change = ((newPrice - history[0].price) / history[0].price) * 100;
                     reel.isPositive = reel.change >= 0;
 
-                    // ✅ OPTIMIZACIÓN: Actualizar solo datos necesarios
                     updateReelData(reel.id, reel);
                     if (reel.id === guidebookState.activeReelId) {
                         updateMainReelData(reel);
@@ -711,13 +1560,11 @@
             setTimeout(addRandomMessage, 2000);
         }
 
-        // ✅ OPTIMIZACIÓN: Chat sin re-renderizar todo
         function addChatMessage(reelId, message) {
             if (!guidebookState.chatMessages[reelId]) guidebookState.chatMessages[reelId] = [];
             guidebookState.chatMessages[reelId].push(message);
             if (guidebookState.chatMessages[reelId].length > 50) guidebookState.chatMessages[reelId].shift();
 
-            // Solo actualizar si es el reel activo
             if (reelId === guidebookState.activeReelId) {
                 var messagesEl = document.querySelector('[data-chat-messages]');
                 if (messagesEl) {
@@ -731,15 +1578,13 @@
                         '</div>'
                     );
                     messagesEl.scrollTop = messagesEl.scrollHeight;
-                    
-                    // Actualizar contador
                     updateChatHeader(findReelById(reelId));
                 }
             }
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // GRÁFICAS (sin cambios significativos)
+        // GRÁFICAS (original)
         // ─────────────────────────────────────────────────────────────────────────
         function drawAllCharts() {
             for (var i = 0; i < guidebookState.smallReels.length; i++) {
@@ -859,7 +1704,7 @@
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // ✅ INTERACCIONES OPTIMIZADAS (más simples)
+        // INTERACCIONES (original)
         // ─────────────────────────────────────────────────────────────────────────
         function setupReelInteractions() {
             var smallReels = document.querySelectorAll('.reel-small');
@@ -867,15 +1712,12 @@
                 (function(reelEl) {
                     var reelId = reelEl.getAttribute('data-reel-id');
                     
-                    // Click simple para intercambiar
                     reelEl.addEventListener('click', function(e) {
                         if (!reelEl.classList.contains('dragging')) {
-                            console.log('[Click] Intercambiando reel:', reelId);
                             swapReelsWithClick(reelId);
                         }
                     });
 
-                    // Drag & drop
                     reelEl.addEventListener('dragstart', function(e) { 
                         e.dataTransfer.setData('text/plain', reelId); 
                         reelEl.classList.add('dragging'); 
@@ -942,7 +1784,6 @@
             input.value = '';
         }
 
-        // ✅ OPTIMIZACIÓN: Intercambios sin re-renderizar todo
         function swapReelsWithClick(clickedReelId) {
             var currentMainReelId = guidebookState.activeReelId;
             var clickedIndex = guidebookState.smallReels.indexOf(clickedReelId);
@@ -960,8 +1801,7 @@
                 var temp = guidebookState.smallReels[index1];
                 guidebookState.smallReels[index1] = guidebookState.smallReels[index2];
                 guidebookState.smallReels[index2] = temp;
-                
-                // Re-actualizar clases activas
+
                 for (var i = 0; i < REELS_CONFIG.length; i++) {
                     updateReelData(REELS_CONFIG[i].id, REELS_CONFIG[i]);
                 }
@@ -969,10 +1809,10 @@
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // ✅ INICIALIZACIÓN SIMPLIFICADA
+        // INICIALIZACIÓN
         // ─────────────────────────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('📊 Guidebook Module OPTIMIZADO - Iniciando...');
+            console.log('📊 Guidebook Module + Navbar de Mercados - Iniciando...');
 
             // Generar datos iniciales
             for (var i = 0; i < REELS_CONFIG.length; i++) {
@@ -981,30 +1821,25 @@
                 guidebookState.chatMessages[reel.id] = generateInitialChatMessages(reel.symbol);
             }
 
-            // ✅ OPTIMIZACIÓN: No más renderizado inicial, solo configurar datos
             setTimeout(function() {
-                // Inicializar el reel activo
                 switchToReel(guidebookState.activeReelId);
-                
-                // Configurar interacciones
                 setupReelInteractions();
                 setupChatInteractions();
                 setupMenuInteractions();
-                
-                // Iniciar simulaciones
                 startPriceSimulation();
                 startChatSimulation();
-                
-                // Dibujar gráficas iniciales
                 drawAllCharts();
                 
-                console.log('📊 Guidebook Module OPTIMIZADO - Listo ✅');
-                console.log('✨ Optimizaciones:');
-                console.log('  • 50% menos código JavaScript');
-                console.log('  • HTML estático, actualizaciones selectivas');
-                console.log('  • Mejor performance y mantenimiento');
+                console.log('📊 Guidebook Module + Navbar - Listo ✅');
+                console.log('🆕 Features:');
+                console.log('  • Navbar con 5 mercados (DOW, NASDAQ, S&P, FX, Crypto)');
+                console.log('  • Dropdowns con Top 10 activos por categoría');
+                console.log('  • WebSocket Polygon Pro para datos en tiempo real');
+                console.log('  • Selector de reel al elegir un activo');
+                console.log('  • Flash animation en actualizaciones de precio');
             }, 100);
         });
     </script>
+
 </body>
 </html>
