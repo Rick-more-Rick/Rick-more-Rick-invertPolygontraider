@@ -1,4 +1,4 @@
-cerr<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -546,6 +546,7 @@ cerr<!DOCTYPE html>
         .chart-menu-btn.active { background: var(--accent); color: var(--bg-primary); font-weight: 700; }
         .chart-menu-divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
 
+        /* ── v4.1: MAIN CHART + ZOOM/PAN + NBBO ── */
         .main-chart-container {
             flex: 1;
             border: 1px solid var(--border);
@@ -554,9 +555,76 @@ cerr<!DOCTYPE html>
             position: relative;
             min-height: 200px;
             overflow: hidden;
+            cursor: crosshair;
+        }
+        .main-chart-container canvas { width: 100%; height: 100%; display: block; }
+        .main-chart-container.panning { cursor: grabbing; }
+
+        .chart-zoom-controls {
+            position: absolute; bottom: 10px; left: 10px;
+            display: flex; gap: 4px; z-index: 20;
+        }
+        .chart-zoom-btn {
+            width: 28px; height: 28px;
+            background: rgba(17, 24, 39, 0.85);
+            border: 1px solid var(--border); border-radius: 6px;
+            color: var(--text-secondary); font-size: 16px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s ease; line-height: 1;
+        }
+        .chart-zoom-btn:hover { background: rgba(245,158,11,0.15); color: var(--accent); border-color: var(--accent); }
+
+        .chart-price-badge {
+            position: absolute; right: 0; z-index: 15;
+            padding: 3px 8px; font-size: 11px; font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            border-radius: 4px 0 0 4px; pointer-events: none;
+            transition: top 0.3s ease; white-space: nowrap;
+        }
+        .chart-price-badge.positive { background: var(--positive); color: #fff; }
+        .chart-price-badge.negative { background: var(--negative); color: #fff; }
+
+        .chart-crosshair-info {
+            position: absolute; top: 8px; left: 8px;
+            background: rgba(10,14,23,0.88); border: 1px solid var(--border);
+            border-radius: 6px; padding: 6px 10px;
+            font-size: 10px; color: var(--text-secondary);
+            pointer-events: none; z-index: 18; display: none;
+            font-variant-numeric: tabular-nums; line-height: 1.6;
         }
 
-        .main-chart-container canvas { width: 100%; height: 100%; display: block; }
+        .nbbo-status {
+            position: absolute; bottom: 10px; right: 10px;
+            padding: 3px 8px; border-radius: 8px;
+            background: rgba(10,14,23,0.8); border: 1px solid var(--border);
+            font-size: 9px; font-weight: 600; color: var(--text-muted);
+            z-index: 20; pointer-events: none; font-variant-numeric: tabular-nums;
+        }
+        .nbbo-status.live { color: var(--positive); border-color: rgba(34,197,94,0.3); }
+
+        .main-chart-drag-handle {
+            position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; gap: 5px;
+            padding: 3px 12px; border-radius: 10px;
+            background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25);
+            cursor: grab; z-index: 20;
+            font-size: 9px; font-weight: 600; color: var(--accent-soft);
+            opacity: 0; transition: opacity 0.3s ease; user-select: none;
+        }
+        .cont3-chart-section:hover .main-chart-drag-handle { opacity: 0.7; }
+        .main-chart-drag-handle:hover { opacity: 1 !important; background: rgba(245,158,11,0.2); }
+        .main-chart-drag-handle:active { cursor: grabbing; }
+        .main-chart-drag-handle .drag-dots { display: flex; flex-direction: column; gap: 2px; }
+        .main-chart-drag-handle .drag-dots span { display: flex; gap: 2px; }
+        .main-chart-drag-handle .drag-dots span::before,
+        .main-chart-drag-handle .drag-dots span::after {
+            content: ''; width: 3px; height: 3px; border-radius: 50%; background: var(--accent-soft);
+        }
+        .reel-small.drop-target-highlight {
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 20px rgba(245,158,11,0.35) !important;
+            background-color: rgba(245,158,11,0.1) !important;
+        }
 
         .ws-status-badge { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 16px; font-size: 10px; font-weight: 600; }
         .ws-status-badge.connected { background-color: rgba(34, 197, 94, 0.15); color: var(--positive); }
@@ -715,7 +783,6 @@ cerr<!DOCTYPE html>
                 </div>
             </div>
         </div>
-
         <!-- ═══════════════════════════════════════════════════════════════════════ -->
         <!-- CONT 3: GRÁFICA GRANDE + CHAT (ORIGINAL, sin cambios)                 -->
         <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -733,6 +800,7 @@ cerr<!DOCTYPE html>
                         </div>
                     </div>
                 </div>
+                <!--============================-->
                 <div class="chart-internal-menu">
                     <button class="chart-menu-btn active" data-interval="1m">1m</button>
                     <button class="chart-menu-btn" data-interval="5m">5m</button>
@@ -743,13 +811,27 @@ cerr<!DOCTYPE html>
                     <button class="chart-menu-btn" data-interval="1w">1W</button>
                     <button class="chart-menu-btn" data-interval="1M">1M</button>
                 </div>
-                <div class="main-chart-container">
+                <!--============================-->
+                <div class="main-chart-container" id="main-chart-container">
                     <canvas id="main-chart"></canvas>
                     <div class="ws-status-badge connected">
                         <span class="ws-status-dot"></span>
                         <span>En Vivo</span>
                     </div>
+                    <div class="chart-price-badge positive" id="chart-price-badge">$0.00</div>
+                    <div class="chart-crosshair-info" id="chart-crosshair-info"></div>
+                    <div class="chart-zoom-controls">
+                        <button class="chart-zoom-btn" onclick="chartZoom(1)" title="Zoom In">+</button>
+                        <button class="chart-zoom-btn" onclick="chartZoom(-1)" title="Zoom Out">−</button>
+                        <button class="chart-zoom-btn" onclick="chartZoomReset()" title="Reset" style="font-size:11px;">⟲</button>
+                    </div>
+                    <div class="nbbo-status" id="nbbo-status">NBBO: --</div>
+                    <div class="main-chart-drag-handle" id="main-drag-handle" draggable="true">
+                        <div class="drag-dots"><span></span><span></span></div>
+                        ⇄ Arrastrar a reel
+                    </div>
                 </div>
+                <!--============================-->
             </div>
 
             <div class="cont3-chat-section">
@@ -771,7 +853,6 @@ cerr<!DOCTYPE html>
             </div>
         </div>
     </div>
-
     <!-- ═══════════════════════════════════════════════════════════════════════════ -->
     <!-- ✅ REEL SELECTOR MODAL (elegir en cuál reel colocar el activo)             -->
     <!-- ═══════════════════════════════════════════════════════════════════════════ -->
@@ -846,6 +927,12 @@ cerr<!DOCTYPE html>
             'reel-3': 'stocks',
             'reel-4': 'stocks'
         };
+
+        // ═══════════════════════════════════════════════════════════════
+        // 📊 v4.1: REAL NBBO STATE — Polygon WebSocket Q.*/XQ.*/C.*
+        // ═══════════════════════════════════════════════════════════════
+        var realNBBO = {};
+        var nbboUpdateCount = 0;
 
         // ─────────────────────────────────────────────────────────────────────────
         // ✅ v2.1: CONFIG MINI-CHAT FLOTANTE (sin cambios)
@@ -1222,6 +1309,7 @@ cerr<!DOCTYPE html>
         // ═════════════════════════════════════════════════════════════════════════
         // 🔄 v3.0: HISTORIAL REAL DE PRECIOS (reemplaza generatePriceHistory)
         // ═════════════════════════════════════════════════════════════════════════
+
         /**
          * 🔄 v3.0: Obtiene historial REAL de precios minutales desde Polygon Aggs API.
          * Usa barras de 1 minuto de las últimas ~2 horas para el gráfico.
@@ -1290,6 +1378,7 @@ cerr<!DOCTYPE html>
                     fetchPrevDayHistory(ticker, type, reelId);
                 });
         }
+
         /**
          * 🔄 v3.0: Fallback — obtiene historial del último día de trading.
          * Se usa cuando el mercado está cerrado y no hay barras intraday.
@@ -1609,7 +1698,9 @@ cerr<!DOCTYPE html>
             reelMarketType[reelId] = pending.type;
 
             // 🔄 v3.0: Cargar historial REAL en lugar de generarlo con Math.random()
-            guidebookState.priceHistory[reelId] = []; // Limpiar mientras carga
+            guidebookState.priceHistory[reelId] = [];
+            delete orderBookState[reelId]; // 📊 v4.1: Reset OB para nuevo ticker
+            setTimeout(function() { generateOBData(reelId); }, 2000);
             fetchRealPriceHistory(pending.ticker, pending.type, reelId);
 
             guidebookState.chatMessages[reelId] = generateInitialChatMessages(pending.displayTicker);
@@ -1732,8 +1823,15 @@ cerr<!DOCTYPE html>
                     if (msg.ev === 'XT' && type === 'crypto') {
                         handleCryptoTrade(msg);
                     }
+                    if (msg.ev === 'Q' && type === 'stocks') {
+                        handleStockNBBO(msg);
+                    }
+                    if (msg.ev === 'XQ' && type === 'crypto') {
+                        handleCryptoNBBO(msg);
+                    }
                     if (msg.ev === 'C' && type === 'forex') {
                         handleForexQuote(msg);
+                        handleForexNBBO(msg);
                     }
                 }
 
@@ -1797,14 +1895,17 @@ cerr<!DOCTYPE html>
             if (type === 'stocks') {
                 var subs = tickers.map(function(t) { return 'T.' + t; }).join(',');
                 subs += ',' + tickers.map(function(t) { return 'AM.' + t; }).join(',');
+                subs += ',' + tickers.map(function(t) { return 'Q.' + t; }).join(',');
                 ws.send(JSON.stringify({ action: 'subscribe', params: subs }));
             } else if (type === 'crypto') {
-                ws.send(JSON.stringify({ action: 'subscribe', params: tickers.map(function(t) { return 'XT.' + t; }).join(',') }));
+                var cryptoSubs = tickers.map(function(t) { return 'XT.' + t; }).join(',');
+                cryptoSubs += ',' + tickers.map(function(t) { return 'XQ.' + t; }).join(',');
+                ws.send(JSON.stringify({ action: 'subscribe', params: cryptoSubs }));
             } else if (type === 'forex') {
                 ws.send(JSON.stringify({ action: 'subscribe', params: tickers.map(function(t) { return 'C.' + t; }).join(',') }));
             }
 
-            console.log('[WS] Suscrito a ' + type + ':', tickers.length + ' tickers');
+            console.log('[WS] Suscrito a ' + type + ':', tickers.length + ' tickers (+ NBBO quotes)');
         }
 
         function subscribeToTicker(type, ticker) {
@@ -1816,9 +1917,12 @@ cerr<!DOCTYPE html>
 
             if (type === 'stocks') {
                 ws.send(JSON.stringify({ action: 'subscribe', params: 'AM.' + ticker }));
+                ws.send(JSON.stringify({ action: 'subscribe', params: 'Q.' + ticker }));
+            } else if (type === 'crypto') {
+                ws.send(JSON.stringify({ action: 'subscribe', params: 'XQ.' + ticker }));
             }
 
-            console.log('[WS] Suscrito a ticker:', ticker);
+            console.log('[WS] Suscrito a ticker:', ticker, '(+ NBBO)');
         }
 
         // ── Trade Handlers (sin cambios) ──
@@ -1845,6 +1949,77 @@ cerr<!DOCTYPE html>
             var ticker = msg.p;
             updateAssetPrice(ticker, msg.a, 'forex');
             updateReelIfMatches(ticker, msg.a);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // 📊 v4.1: NBBO QUOTE HANDLERS — Real data for Order Book
+        // ═══════════════════════════════════════════════════════════════
+
+        function handleStockNBBO(msg) {
+            if (!msg.sym || !msg.bp || !msg.ap) return;
+            realNBBO[msg.sym] = {
+                bp: msg.bp, bs: (msg.bs || 1) * 100,
+                ap: msg.ap, as: (msg.as || 1) * 100,
+                spread: msg.ap - msg.bp,
+                spreadPct: ((msg.ap - msg.bp) / msg.bp) * 100,
+                t: msg.t || Date.now(), source: 'NBBO'
+            };
+            nbboUpdateCount++;
+            updateNBBODisplay(msg.sym);
+        }
+
+        function handleCryptoNBBO(msg) {
+            var ticker = msg.pair;
+            if (!ticker || !msg.bp || !msg.ap) return;
+            realNBBO[ticker] = {
+                bp: msg.bp, bs: msg.bs || 0,
+                ap: msg.ap, as: msg.as || 0,
+                spread: msg.ap - msg.bp,
+                spreadPct: ((msg.ap - msg.bp) / msg.bp) * 100,
+                t: msg.t || Date.now(), source: 'BBO'
+            };
+            nbboUpdateCount++;
+            updateNBBODisplay(ticker);
+        }
+
+        function handleForexNBBO(msg) {
+            var ticker = msg.p;
+            if (!ticker || !msg.b || !msg.a) return;
+            realNBBO[ticker] = {
+                bp: msg.b, bs: 0,
+                ap: msg.a, as: 0,
+                spread: msg.a - msg.b,
+                spreadPct: ((msg.a - msg.b) / msg.b) * 100,
+                t: msg.t || Date.now(), source: 'FX Quote'
+            };
+            nbboUpdateCount++;
+            updateNBBODisplay(ticker);
+        }
+
+        function updateNBBODisplay(ticker) {
+            var activeReel = guidebookState.activeReelId;
+            var activeTicker = reelTickerMap[activeReel];
+            if (ticker !== activeTicker) return;
+            var nbbo = realNBBO[ticker];
+            if (!nbbo) return;
+            var el = document.getElementById('nbbo-status');
+            if (el) {
+                el.className = 'nbbo-status live';
+                el.innerHTML = 'NBBO: ' +
+                    '<span style="color:#26a69a">B ' + formatPrice(nbbo.bp) + '</span>' +
+                    ' × ' +
+                    '<span style="color:#ef5350">A ' + formatPrice(nbbo.ap) + '</span>' +
+                    ' <span style="color:var(--text-muted)">| spread ' + nbbo.spreadPct.toFixed(3) + '%</span>';
+            }
+        }
+
+        function getNBBOForReel(reelId) {
+            var ticker = reelTickerMap[reelId];
+            if (!ticker) return null;
+            var nbbo = realNBBO[ticker];
+            if (!nbbo || !nbbo.bp || !nbbo.ap) return null;
+            if (Date.now() - (nbbo.t || 0) > 30000) return null;
+            return nbbo;
         }
 
         // ═════════════════════════════════════════════════════════════════════════
@@ -2272,13 +2447,176 @@ cerr<!DOCTYPE html>
             for (var i = 0; i < smallReels.length; i++) { renderMiniChat(smallReels[i]); }
         }
 
-        // ─────────────────────────────────────────────────────────────────────────
-        // GRÁFICAS (sin cambios)
-        // ─────────────────────────────────────────────────────────────────────────
-        function drawAllCharts() {
-            for (var i = 0; i < guidebookState.smallReels.length; i++) {
-                drawMiniChart(guidebookState.smallReels[i]);
+        // ═══════════════════════════════════════════════════════════════════════
+        // 📊 v4.1: CANDLESTICK + REAL NBBO ORDER BOOK HEATMAP + ZOOM/PAN
+        // ═══════════════════════════════════════════════════════════════════════
+
+        var chartViewState = {
+            zoomLevel: 1, panOffset: 0, isPanning: false,
+            panStartX: 0, panStartOffset: 0,
+            mouseX: -1, mouseY: -1, maxZoom: 8, minZoom: 0.5
+        };
+
+        var orderBookState = {};
+        var OB_CONFIG = {
+            levels: 30, maxDepth: 400, decay: 0.82,
+            clusters: 5, updateMs: 1800,
+            mainOpacity: 0.45, miniOpacity: 0.30, trailLen: 50
+        };
+
+        function generateOBData(reelId) {
+            var reel = findReelById(reelId);
+            if (!reel || reel.price <= 0) return;
+            var nbbo = getNBBOForReel(reelId);
+            var hasReal = !!nbbo;
+            var bidCenter = hasReal ? nbbo.bp : reel.price * 0.9999;
+            var askCenter = hasReal ? nbbo.ap : reel.price * 1.0001;
+            var midPrice = (bidCenter + askCenter) / 2;
+            var baseBidVol = Math.max(hasReal ? nbbo.bs : OB_CONFIG.maxDepth * 0.8, 50);
+            var baseAskVol = Math.max(hasReal ? nbbo.as : OB_CONFIG.maxDepth * 0.8, 50);
+            var hist = guidebookState.priceHistory[reelId] || [];
+            var pArr = hist.map(function(h) { return h.price; });
+            var lo = pArr.length > 0 ? Math.min.apply(null, pArr) : midPrice * 0.995;
+            var hi = pArr.length > 0 ? Math.max.apply(null, pArr) : midPrice * 1.005;
+            var rng = hi - lo || midPrice * 0.01;
+            var realSpread = askCenter - bidCenter;
+            var tick = hasReal ? Math.max(realSpread * 0.8, rng / (OB_CONFIG.levels * 2)) : rng / (OB_CONFIG.levels * 2);
+
+            if (!orderBookState[reelId]) {
+                orderBookState[reelId] = { bids: [], asks: [], trail: [], clusters: [], hasRealNBBO: false };
+                for (var c = 0; c < OB_CONFIG.clusters; c++)
+                    orderBookState[reelId].clusters.push(midPrice + (Math.random() - 0.5) * rng * 1.5);
             }
+            var ob = orderBookState[reelId];
+            ob.hasRealNBBO = hasReal;
+
+            var bids = [], asks = [];
+            for (var i = 0; i < OB_CONFIG.levels; i++) {
+                var bp = bidCenter - i * tick, ap = askCenter + i * tick;
+                var bv, av;
+                if (i === 0) { bv = baseBidVol * (0.8 + Math.random() * 0.4); av = baseAskVol * (0.8 + Math.random() * 0.4); }
+                else { bv = baseBidVol * Math.pow(OB_CONFIG.decay, i) * (0.3 + Math.random() * 1.4); av = baseAskVol * Math.pow(OB_CONFIG.decay, i) * (0.3 + Math.random() * 1.4); }
+                for (var j = 0; j < ob.clusters.length; j++) {
+                    if (Math.abs(bp - ob.clusters[j]) < tick * 3) bv *= 2.5 + Math.random() * 2;
+                    if (Math.abs(ap - ob.clusters[j]) < tick * 3) av *= 2.5 + Math.random() * 2;
+                }
+                if (Math.random() < 0.07) bv *= 3 + Math.random() * 4;
+                if (Math.random() < 0.07) av *= 3 + Math.random() * 4;
+                bids.push({ price: bp, vol: Math.round(bv) });
+                asks.push({ price: ap, vol: Math.round(av) });
+            }
+            ob.bids = bids; ob.asks = asks;
+            ob.trail.push({ bids: bids.slice(0, 15), asks: asks.slice(0, 15), cp: midPrice });
+            if (ob.trail.length > OB_CONFIG.trailLen) ob.trail.shift();
+        }
+
+        function evolveOB(reelId) {
+            var ob = orderBookState[reelId]; if (!ob) return;
+            var reel = findReelById(reelId); if (!reel) return;
+            var hist = guidebookState.priceHistory[reelId] || [];
+            var pArr = hist.map(function(h) { return h.price; });
+            var rng = pArr.length > 1 ? Math.max.apply(null, pArr) - Math.min.apply(null, pArr) : reel.price * 0.01;
+            for (var i = 0; i < ob.clusters.length; i++) {
+                ob.clusters[i] += (reel.price - ob.clusters[i]) * 0.02 + (Math.random() - 0.5) * rng * 0.15;
+            }
+            if (Math.random() < 0.1) ob.clusters[Math.floor(Math.random() * ob.clusters.length)] = reel.price + (Math.random() - 0.5) * rng * 1.5;
+        }
+
+        function obColor(intensity, isBid) {
+            var r, g, b;
+            if (isBid) {
+                if (intensity < 0.25) { r = 0; g = Math.round(25 + intensity * 4 * 70); b = Math.round(50 + intensity * 4 * 90); }
+                else if (intensity < 0.5) { var t = (intensity - 0.25) * 4; r = 0; g = Math.round(95 + t * 130); b = Math.round(140 - t * 50); }
+                else if (intensity < 0.75) { var t2 = (intensity - 0.5) * 4; r = Math.round(t2 * 80); g = Math.round(225 + t2 * 30); b = Math.round(90 - t2 * 70); }
+                else { var t3 = (intensity - 0.75) * 4; r = Math.round(80 + t3 * 175); g = 255; b = Math.round(20 - t3 * 20); }
+            } else {
+                if (intensity < 0.25) { r = Math.round(50 + intensity * 4 * 90); g = Math.round(12 + intensity * 4 * 18); b = Math.round(25 + intensity * 4 * 15); }
+                else if (intensity < 0.5) { var t4 = (intensity - 0.25) * 4; r = Math.round(140 + t4 * 80); g = Math.round(30 + t4 * 45); b = Math.round(40 - t4 * 25); }
+                else if (intensity < 0.75) { var t5 = (intensity - 0.5) * 4; r = Math.round(220 + t5 * 35); g = Math.round(75 + t5 * 70); b = Math.round(15 - t5 * 10); }
+                else { var t6 = (intensity - 0.75) * 4; r = 255; g = Math.round(145 + t6 * 110); b = 0; }
+            }
+            return { r: r, g: g, b: b };
+        }
+
+        function drawOBHeatmap(ctx, reelId, W, H, pad, isMain) {
+            var ob = orderBookState[reelId];
+            if (!ob || !ob.bids.length) return;
+            var hist = guidebookState.priceHistory[reelId] || [];
+            if (hist.length < 2) return;
+            var pArr = hist.map(function(h) { return h.price; });
+            var lo = Math.min.apply(null, pArr), hi = Math.max.apply(null, pArr);
+            var allOB = ob.bids.concat(ob.asks).map(function(l) { return l.price; });
+            lo = Math.min(lo, Math.min.apply(null, allOB));
+            hi = Math.max(hi, Math.max.apply(null, allOB));
+            var rng = hi - lo || 1;
+            var p = isMain ? pad : { top: 0, right: 0, bottom: 0, left: 0 };
+            var cW = W - p.left - p.right, cH = H - p.top - p.bottom;
+            var maxV = 1;
+            for (var i = 0; i < ob.bids.length; i++) if (ob.bids[i].vol > maxV) maxV = ob.bids[i].vol;
+            for (var i2 = 0; i2 < ob.asks.length; i2++) if (ob.asks[i2].vol > maxV) maxV = ob.asks[i2].vol;
+            var alpha = isMain ? OB_CONFIG.mainOpacity : OB_CONFIG.miniOpacity;
+            if (ob.trail.length > 1) {
+                var tW = cW / Math.max(ob.trail.length, 1);
+                for (var ti = 0; ti < ob.trail.length; ti++) {
+                    var sn = ob.trail[ti];
+                    var tx = p.left + (ti / (ob.trail.length - 1)) * cW;
+                    var tOp = alpha * (0.08 + 0.92 * (ti / ob.trail.length));
+                    var tw = Math.max(tW * 1.3, isMain ? 3 : 1.5);
+                    for (var tb = 0; tb < sn.bids.length; tb++) {
+                        var bY = p.top + cH - ((sn.bids[tb].price - lo) / rng) * cH;
+                        var bI = Math.min(sn.bids[tb].vol / maxV, 1);
+                        var bH2 = Math.max(cH / (OB_CONFIG.levels * 1.4), isMain ? 2.5 : 1.2);
+                        if (bY >= p.top && bY <= p.top + cH) { var bc = obColor(bI, true); ctx.fillStyle = 'rgba(' + bc.r + ',' + bc.g + ',' + bc.b + ',' + (tOp * bI * 0.85) + ')'; ctx.fillRect(tx - tw / 2, bY - bH2 / 2, tw, bH2); }
+                    }
+                    for (var ta = 0; ta < sn.asks.length; ta++) {
+                        var aY = p.top + cH - ((sn.asks[ta].price - lo) / rng) * cH;
+                        var aI = Math.min(sn.asks[ta].vol / maxV, 1);
+                        var aH2 = Math.max(cH / (OB_CONFIG.levels * 1.4), isMain ? 2.5 : 1.2);
+                        if (aY >= p.top && aY <= p.top + cH) { var ac = obColor(aI, false); ctx.fillStyle = 'rgba(' + ac.r + ',' + ac.g + ',' + ac.b + ',' + (tOp * aI * 0.85) + ')'; ctx.fillRect(tx - tw / 2, aY - aH2 / 2, tw, aH2); }
+                    }
+                }
+            }
+            if (isMain) {
+                var barMax = 50, hasReal = ob.hasRealNBBO;
+                for (var bi = 0; bi < ob.bids.length; bi++) {
+                    var bYc = p.top + cH - ((ob.bids[bi].price - lo) / rng) * cH;
+                    var bIc = Math.min(ob.bids[bi].vol / maxV, 1);
+                    if (bYc >= p.top && bYc <= p.top + cH) {
+                        var bcc = obColor(bIc, true);
+                        var bAlpha = (bi === 0 && hasReal) ? 0.95 : (alpha * 0.6 + bIc * 0.4);
+                        var bWidth = (bi === 0 && hasReal) ? Math.max(bIc * barMax, 20) : bIc * barMax;
+                        ctx.fillStyle = 'rgba(' + bcc.r + ',' + bcc.g + ',' + bcc.b + ',' + bAlpha + ')';
+                        ctx.fillRect(p.left + cW - bWidth, bYc - 1.5, bWidth, 3);
+                        if (bIc > 0.55 || (bi === 0 && hasReal)) { ctx.fillStyle = 'rgba(' + bcc.r + ',' + bcc.g + ',' + bcc.b + ',' + (hasReal && bi === 0 ? 0.12 : 0.08) + ')'; ctx.fillRect(p.left, bYc - 2, cW, 4); }
+                    }
+                }
+                for (var ai = 0; ai < ob.asks.length; ai++) {
+                    var aYc = p.top + cH - ((ob.asks[ai].price - lo) / rng) * cH;
+                    var aIc = Math.min(ob.asks[ai].vol / maxV, 1);
+                    if (aYc >= p.top && aYc <= p.top + cH) {
+                        var acc = obColor(aIc, false);
+                        var aAlpha = (ai === 0 && hasReal) ? 0.95 : (alpha * 0.6 + aIc * 0.4);
+                        var aWidth = (ai === 0 && hasReal) ? Math.max(aIc * barMax, 20) : aIc * barMax;
+                        ctx.fillStyle = 'rgba(' + acc.r + ',' + acc.g + ',' + acc.b + ',' + aAlpha + ')';
+                        ctx.fillRect(p.left + cW - aWidth, aYc - 1.5, aWidth, 3);
+                        if (aIc > 0.55 || (ai === 0 && hasReal)) { ctx.fillStyle = 'rgba(' + acc.r + ',' + acc.g + ',' + acc.b + ',' + (hasReal && ai === 0 ? 0.12 : 0.08) + ')'; ctx.fillRect(p.left, aYc - 2, cW, 4); }
+                    }
+                }
+            }
+        }
+
+        function startOBUpdates() {
+            for (var i = 0; i < REELS_CONFIG.length; i++) generateOBData(REELS_CONFIG[i].id);
+            setInterval(function() {
+                for (var i = 0; i < REELS_CONFIG.length; i++) { evolveOB(REELS_CONFIG[i].id); generateOBData(REELS_CONFIG[i].id); }
+            }, OB_CONFIG.updateMs);
+            console.log('[OrderBook] ✅ v4.1 NBBO-anchored heatmap activo');
+        }
+
+        // ── CHART DRAWING ──
+
+        function drawAllCharts() {
+            for (var i = 0; i < guidebookState.smallReels.length; i++) drawMiniChart(guidebookState.smallReels[i]);
             drawMainChart();
         }
 
@@ -2287,40 +2625,33 @@ cerr<!DOCTYPE html>
             if (!canvas) return;
             var ctx = canvas.getContext('2d');
             var container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-
+            canvas.width = container.clientWidth; canvas.height = container.clientHeight;
+            var W = canvas.width, H = canvas.height;
             var history = guidebookState.priceHistory[reelId];
             if (!history || history.length < 2) return;
-            var reel = findReelById(reelId);
-            if (!reel) return;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            var prices = history.map(function(h) { return h.price; });
-            var minPrice = Math.min.apply(null, prices);
-            var maxPrice = Math.max.apply(null, prices);
-            var priceRange = maxPrice - minPrice || 1;
-
-            ctx.beginPath();
-            ctx.strokeStyle = reel.isPositive ? '#22c55e' : '#ef4444';
-            ctx.lineWidth = 2.5;
-            ctx.lineJoin = 'round';
-
+            var reel = findReelById(reelId); if (!reel) return;
+            ctx.clearRect(0, 0, W, H);
+            var allH = [], allL = [];
+            for (var i = 0; i < history.length; i++) { allH.push(history[i].high || history[i].price); allL.push(history[i].low || history[i].price); }
+            var minP = Math.min.apply(null, allL), maxP = Math.max.apply(null, allH);
+            var rng = maxP - minP || 1;
+            drawOBHeatmap(ctx, reelId, W, H, null, false);
+            var barW = Math.max(W / history.length - 1, 1.5);
+            var gap = W / history.length;
             for (var k = 0; k < history.length; k++) {
-                var x = (k / (history.length - 1)) * canvas.width;
-                var y = canvas.height - ((history[k].price - minPrice) / priceRange) * canvas.height;
-                if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                var bar = history[k];
+                var o = bar.open || bar.price, c = bar.price;
+                var h = bar.high || Math.max(o, c), l = bar.low || Math.min(o, c);
+                var bull = c >= o;
+                var x = k * gap + gap / 2;
+                var yH = H - ((h - minP) / rng) * H, yL = H - ((l - minP) / rng) * H;
+                var yO = H - ((o - minP) / rng) * H, yC = H - ((c - minP) / rng) * H;
+                var color = bull ? '#26a69a' : '#ef5350';
+                ctx.strokeStyle = color; ctx.lineWidth = 0.8;
+                ctx.beginPath(); ctx.moveTo(x, yH); ctx.lineTo(x, yL); ctx.stroke();
+                ctx.fillStyle = color;
+                ctx.fillRect(x - barW / 2, Math.min(yO, yC), barW, Math.max(Math.abs(yO - yC), 0.5));
             }
-            ctx.stroke();
-
-            ctx.lineTo(canvas.width, canvas.height);
-            ctx.lineTo(0, canvas.height);
-            ctx.closePath();
-            var gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, reel.isPositive ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = gradient;
-            ctx.fill();
         }
 
         function drawMainChart() {
@@ -2328,83 +2659,197 @@ cerr<!DOCTYPE html>
             if (!canvas) return;
             var ctx = canvas.getContext('2d');
             var container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
+            canvas.width = container.clientWidth; canvas.height = container.clientHeight;
+            var W = canvas.width, H = canvas.height;
+            var allHistory = guidebookState.priceHistory[guidebookState.activeReelId];
+            if (!allHistory || allHistory.length < 2) return;
+            var reel = findReelById(guidebookState.activeReelId); if (!reel) return;
 
-            var history = guidebookState.priceHistory[guidebookState.activeReelId];
-            if (!history || history.length < 2) return;
-            var reel = findReelById(guidebookState.activeReelId);
-            if (!reel) return;
+            var totalBars = allHistory.length;
+            var visibleBars = Math.max(Math.round(totalBars / chartViewState.zoomLevel), 5);
+            var maxOffset = Math.max(totalBars - visibleBars, 0);
+            chartViewState.panOffset = Math.max(0, Math.min(chartViewState.panOffset, maxOffset));
+            var startIdx = Math.round(chartViewState.panOffset);
+            var endIdx = Math.min(startIdx + visibleBars, totalBars);
+            var history = allHistory.slice(startIdx, endIdx);
+            if (history.length < 2) return;
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            var prices = history.map(function(h) { return h.price; });
-            var minPrice = Math.min.apply(null, prices);
-            var maxPrice = Math.max.apply(null, prices);
-            var priceRange = maxPrice - minPrice || 1;
-            var padding = { top: 25, right: 80, bottom: 35, left: 25 };
-            var chartWidth = canvas.width - padding.left - padding.right;
-            var chartHeight = canvas.height - padding.top - padding.bottom;
+            ctx.clearRect(0, 0, W, H);
+            var padding = { top: 20, right: 80, bottom: 55, left: 10 };
+            var chartW = W - padding.left - padding.right;
+            var chartH = H - padding.top - padding.bottom;
+            var volH = chartH * 0.15, priceH = chartH - volH;
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-            ctx.lineWidth = 1;
-            for (var g = 0; g <= 6; g++) {
-                var gy = padding.top + (chartHeight / 6) * g;
-                ctx.beginPath();
-                ctx.moveTo(padding.left, gy);
-                ctx.lineTo(canvas.width - padding.right, gy);
-                ctx.stroke();
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.font = '11px sans-serif';
-                ctx.fillText(formatPrice(maxPrice - (priceRange / 6) * g), canvas.width - padding.right + 10, gy + 4);
+            var allHi = [], allLo = [], allVol = [];
+            for (var i = 0; i < history.length; i++) {
+                allHi.push(history[i].high || history[i].price);
+                allLo.push(history[i].low || history[i].price);
+                allVol.push(history[i].volume || 0);
             }
+            var minP = Math.min.apply(null, allLo), maxP = Math.max.apply(null, allHi);
+            var pRng = maxP - minP; minP -= pRng * 0.05; maxP += pRng * 0.05; pRng = maxP - minP || 1;
+            var maxVol = Math.max.apply(null, allVol) || 1;
+
+            var gridLines = 8; ctx.textAlign = 'left';
+            for (var g = 0; g <= gridLines; g++) {
+                var gy = padding.top + (priceH / gridLines) * g;
+                ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(padding.left, gy); ctx.lineTo(padding.left + chartW, gy); ctx.stroke();
+                ctx.fillStyle = 'rgba(148,163,184,0.7)'; ctx.font = '10px monospace';
+                ctx.fillText(formatPrice(maxP - (pRng / gridLines) * g), W - padding.right + 8, gy + 4);
+            }
+
+            drawOBHeatmap(ctx, guidebookState.activeReelId, W, H,
+                { top: padding.top, right: padding.right, bottom: padding.bottom + volH, left: padding.left }, true);
 
             var activeType = reelMarketType[guidebookState.activeReelId] || 'stocks';
             var mktLabel = '';
-            if (marketStatus[activeType] === 'after-hours') {
-                mktLabel = '🟠 AFTER HOURS — EN VIVO';  // 🔄 v3.0
-            } else if (marketStatus[activeType] === 'closed') {
-                mktLabel = '🔴 CERRADO (último cierre real)';  // 🔄 v3.0
-            } else if (marketStatus[activeType] === 'pre-market') {
-                mktLabel = '🟡 PRE-MARKET — EN VIVO';  // 🔄 v3.0
-            }
+            if (marketStatus[activeType] === 'after-hours') mktLabel = '🟠 AFTER HOURS';
+            else if (marketStatus[activeType] === 'closed') mktLabel = '🔴 CERRADO';
+            else if (marketStatus[activeType] === 'pre-market') mktLabel = '🟡 PRE-MARKET';
+            if (mktLabel) { ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '10px sans-serif'; ctx.fillText(mktLabel, padding.left + 5, padding.top + 12); }
 
-            if (mktLabel) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-                ctx.font = '12px sans-serif';
-                ctx.fillText(mktLabel, padding.left + 5, padding.top + 15);
-            }
-
-            ctx.beginPath();
-            ctx.strokeStyle = reel.isPositive ? '#22c55e' : '#ef4444';
-            ctx.lineWidth = 3;
-            ctx.lineJoin = 'round';
-
+            var barGap = chartW / history.length;
+            var barW = Math.max(barGap * 0.65, 2); if (barW > 18) barW = 18;
             for (var k = 0; k < history.length; k++) {
-                var x = padding.left + (k / (history.length - 1)) * chartWidth;
-                var y = padding.top + chartHeight - ((history[k].price - minPrice) / priceRange) * chartHeight;
-                if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                var bar = history[k];
+                var o = bar.open || bar.price, c = bar.price;
+                var h = bar.high || Math.max(o, c), l = bar.low || Math.min(o, c);
+                var v = bar.volume || 0; var bull = c >= o;
+                var x = padding.left + k * barGap + barGap / 2;
+                var yH = padding.top + priceH - ((h - minP) / pRng) * priceH;
+                var yL = padding.top + priceH - ((l - minP) / pRng) * priceH;
+                var yO = padding.top + priceH - ((o - minP) / pRng) * priceH;
+                var yC = padding.top + priceH - ((c - minP) / pRng) * priceH;
+                ctx.strokeStyle = bull ? '#2bbd9a' : '#f7525f'; ctx.lineWidth = Math.max(barW * 0.12, 1);
+                ctx.beginPath(); ctx.moveTo(x, yH); ctx.lineTo(x, yL); ctx.stroke();
+                ctx.fillStyle = bull ? '#26a69a' : '#ef5350';
+                ctx.fillRect(x - barW / 2, Math.min(yO, yC), barW, Math.max(Math.abs(yO - yC), 1));
+                var volBarH = (v / maxVol) * volH * 0.85;
+                ctx.fillStyle = bull ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)';
+                ctx.fillRect(x - barW / 2, padding.top + priceH + volH - volBarH, barW, volBarH);
             }
-            ctx.stroke();
 
-            ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
-            ctx.lineTo(padding.left, padding.top + chartHeight);
-            ctx.closePath();
-            var gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
-            gradient.addColorStop(0, reel.isPositive ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = gradient;
-            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]); ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top + priceH); ctx.lineTo(padding.left + chartW, padding.top + priceH); ctx.stroke(); ctx.setLineDash([]);
 
-            var lastY = padding.top + chartHeight - ((history[history.length - 1].price - minPrice) / priceRange) * chartHeight;
-            ctx.beginPath();
-            ctx.arc(padding.left + chartWidth, lastY, 8, 0, Math.PI * 2);
-            ctx.fillStyle = reel.isPositive ? '#22c55e' : '#ef4444';
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(padding.left + chartWidth, lastY, 8, 0, Math.PI * 2);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            var lastPrice = history[history.length - 1].price;
+            var lastY = padding.top + priceH - ((lastPrice - minP) / pRng) * priceH;
+            ctx.strokeStyle = reel.isPositive ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)';
+            ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath();
+            ctx.moveTo(padding.left, lastY); ctx.lineTo(padding.left + chartW, lastY); ctx.stroke(); ctx.setLineDash([]);
+
+            var badge = document.getElementById('chart-price-badge');
+            if (badge) {
+                badge.textContent = formatPrice(lastPrice);
+                badge.style.top = (lastY - 10) + 'px';
+                badge.className = 'chart-price-badge ' + (reel.isPositive ? 'positive' : 'negative');
+            }
+
+            var nbbo = getNBBOForReel(guidebookState.activeReelId);
+            if (nbbo) {
+                var bidY = padding.top + priceH - ((nbbo.bp - minP) / pRng) * priceH;
+                var askY = padding.top + priceH - ((nbbo.ap - minP) / pRng) * priceH;
+                if (bidY > padding.top && bidY < padding.top + priceH) {
+                    ctx.strokeStyle = 'rgba(38,166,154,0.6)'; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath();
+                    ctx.moveTo(padding.left, bidY); ctx.lineTo(padding.left + chartW, bidY); ctx.stroke(); ctx.setLineDash([]);
+                    ctx.fillStyle = 'rgba(38,166,154,0.85)'; ctx.font = 'bold 9px monospace';
+                    ctx.fillText('BID ' + formatPrice(nbbo.bp), padding.left + 4, bidY - 3);
+                }
+                if (askY > padding.top && askY < padding.top + priceH) {
+                    ctx.strokeStyle = 'rgba(239,83,80,0.6)'; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath();
+                    ctx.moveTo(padding.left, askY); ctx.lineTo(padding.left + chartW, askY); ctx.stroke(); ctx.setLineDash([]);
+                    ctx.fillStyle = 'rgba(239,83,80,0.85)'; ctx.font = 'bold 9px monospace';
+                    ctx.fillText('ASK ' + formatPrice(nbbo.ap), padding.left + 4, askY + 10);
+                }
+                if (bidY > askY) { ctx.fillStyle = 'rgba(245,158,11,0.04)'; ctx.fillRect(padding.left, askY, chartW, bidY - askY); }
+            }
+
+            if (chartViewState.mouseX > padding.left && chartViewState.mouseX < W - padding.right &&
+                chartViewState.mouseY > padding.top && chartViewState.mouseY < padding.top + priceH) {
+                var mx = chartViewState.mouseX, my = chartViewState.mouseY;
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+                ctx.beginPath(); ctx.moveTo(mx, padding.top); ctx.lineTo(mx, padding.top + priceH); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(padding.left, my); ctx.lineTo(padding.left + chartW, my); ctx.stroke(); ctx.setLineDash([]);
+                var cursorPrice = maxP - ((my - padding.top) / priceH) * pRng;
+                ctx.fillStyle = 'rgba(30,41,59,0.9)'; ctx.fillRect(W - padding.right, my - 10, padding.right, 20);
+                ctx.strokeStyle = 'rgba(148,163,184,0.4)'; ctx.strokeRect(W - padding.right, my - 10, padding.right, 20);
+                ctx.fillStyle = '#e2e8f0'; ctx.font = '10px monospace';
+                ctx.fillText(formatPrice(cursorPrice), W - padding.right + 8, my + 4);
+                var barIdx = Math.round((mx - padding.left) / barGap - 0.5);
+                barIdx = Math.max(0, Math.min(barIdx, history.length - 1));
+                var hoverBar = history[barIdx];
+                var infoEl = document.getElementById('chart-crosshair-info');
+                if (infoEl && hoverBar) {
+                    var hO = hoverBar.open || hoverBar.price, hC = hoverBar.price;
+                    var hH = hoverBar.high || Math.max(hO, hC), hL = hoverBar.low || Math.min(hO, hC);
+                    var hV = hoverBar.volume || 0;
+                    var dt = hoverBar.time ? new Date(hoverBar.time) : null;
+                    var timeStr = dt ? dt.toLocaleTimeString() : '';
+                    infoEl.style.display = 'block';
+                    infoEl.innerHTML = (timeStr ? '<b>' + timeStr + '</b><br>' : '') +
+                        'O: <span style="color:#e2e8f0">' + formatPrice(hO) + '</span>  ' +
+                        'H: <span style="color:#26a69a">' + formatPrice(hH) + '</span>  ' +
+                        'L: <span style="color:#ef5350">' + formatPrice(hL) + '</span>  ' +
+                        'C: <span style="color:#e2e8f0">' + formatPrice(hC) + '</span>' +
+                        (hV > 0 ? '<br>Vol: <span style="color:#94a3b8">' + hV.toLocaleString() + '</span>' : '');
+                }
+            } else {
+                var infoEl2 = document.getElementById('chart-crosshair-info');
+                if (infoEl2) infoEl2.style.display = 'none';
+            }
+
+            ctx.fillStyle = 'rgba(148,163,184,0.5)'; ctx.font = '9px monospace'; ctx.textAlign = 'center';
+            var timeStep = Math.max(Math.floor(history.length / 8), 1);
+            for (var ti = 0; ti < history.length; ti += timeStep) {
+                var tBar = history[ti];
+                if (tBar.time) {
+                    var d = new Date(tBar.time);
+                    ctx.fillText(d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'),
+                        padding.left + ti * barGap + barGap / 2, H - padding.bottom + volH + 14);
+                }
+            }
+            ctx.textAlign = 'left';
+        }
+
+        function chartZoom(dir) {
+            var old = chartViewState.zoomLevel;
+            if (dir > 0) chartViewState.zoomLevel = Math.min(chartViewState.zoomLevel * 1.4, chartViewState.maxZoom);
+            else chartViewState.zoomLevel = Math.max(chartViewState.zoomLevel / 1.4, chartViewState.minZoom);
+            var hist = guidebookState.priceHistory[guidebookState.activeReelId] || [];
+            var delta = (Math.round(hist.length / old) - Math.round(hist.length / chartViewState.zoomLevel)) / 2;
+            chartViewState.panOffset += delta;
+            drawMainChart();
+        }
+        function chartZoomReset() { chartViewState.zoomLevel = 1; chartViewState.panOffset = 0; drawMainChart(); }
+
+        function setupMainChartInteractions() {
+            var container = document.getElementById('main-chart-container'); if (!container) return;
+            var canvas = document.getElementById('main-chart');
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                if (e.deltaY < 0) chartZoom(1); else chartZoom(-1);
+            }, { passive: false });
+            container.addEventListener('mousedown', function(e) {
+                if (e.target.closest('.chart-zoom-btn') || e.target.closest('.main-chart-drag-handle')) return;
+                chartViewState.isPanning = true; chartViewState.panStartX = e.clientX;
+                chartViewState.panStartOffset = chartViewState.panOffset;
+                container.classList.add('panning');
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (canvas) { var rect = canvas.getBoundingClientRect(); chartViewState.mouseX = e.clientX - rect.left; chartViewState.mouseY = e.clientY - rect.top; }
+                if (!chartViewState.isPanning) return;
+                var dx = e.clientX - chartViewState.panStartX;
+                var hist = guidebookState.priceHistory[guidebookState.activeReelId] || [];
+                var visibleBars = Math.round(hist.length / chartViewState.zoomLevel);
+                var pxPerBar = (canvas ? canvas.width : 800) / visibleBars;
+                chartViewState.panOffset = chartViewState.panStartOffset - dx / pxPerBar;
+                drawMainChart();
+            });
+            document.addEventListener('mouseup', function() { chartViewState.isPanning = false; if (container) container.classList.remove('panning'); });
+            container.addEventListener('mouseleave', function() { chartViewState.mouseX = -1; chartViewState.mouseY = -1; drawMainChart(); });
+            console.log('[Chart] ✅ Zoom/Pan + Crosshair + NBBO overlay activos');
         }
 
         // ─────────────────────────────────────────────────────────────────────────
@@ -2424,12 +2869,39 @@ cerr<!DOCTYPE html>
                     reelEl.addEventListener('dragover', function(e) { e.preventDefault(); reelEl.classList.add('drag-over'); });
                     reelEl.addEventListener('dragleave', function() { reelEl.classList.remove('drag-over'); });
                     reelEl.addEventListener('drop', function(e) {
-                        e.preventDefault(); reelEl.classList.remove('drag-over');
+                        e.preventDefault(); reelEl.classList.remove('drag-over'); reelEl.classList.remove('drop-target-highlight');
                         var draggedId = e.dataTransfer.getData('text/plain');
-                        if (draggedId !== reelId) swapSmallReels(draggedId, reelId);
+                        if (draggedId === 'MAIN_REEL') { swapMainWithSmall(reelId); }
+                        else if (draggedId !== reelId) { swapSmallReels(draggedId, reelId); }
                     });
                 })(smallReels[i]);
             }
+            setupMainReelDrag();
+        }
+
+        function setupMainReelDrag() {
+            var handle = document.getElementById('main-drag-handle'); if (!handle) return;
+            handle.addEventListener('dragstart', function(e) {
+                e.dataTransfer.setData('text/plain', 'MAIN_REEL');
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(function() {
+                    var smalls = document.querySelectorAll('.reel-small');
+                    for (var i = 0; i < smalls.length; i++) smalls[i].classList.add('drop-target-highlight');
+                }, 50);
+            });
+            handle.addEventListener('dragend', function() {
+                var smalls = document.querySelectorAll('.reel-small');
+                for (var i = 0; i < smalls.length; i++) smalls[i].classList.remove('drop-target-highlight');
+            });
+        }
+
+        function swapMainWithSmall(smallReelId) {
+            var mainReelId = guidebookState.activeReelId;
+            var idx = guidebookState.smallReels.indexOf(smallReelId);
+            if (idx === -1) return;
+            guidebookState.smallReels[idx] = mainReelId;
+            chartViewState.zoomLevel = 1; chartViewState.panOffset = 0;
+            switchToReel(smallReelId);
         }
 
         function setupChatInteractions() {
@@ -2463,6 +2935,7 @@ cerr<!DOCTYPE html>
             var clickedIndex = guidebookState.smallReels.indexOf(clickedReelId);
             if (clickedIndex === -1) return;
             guidebookState.smallReels[clickedIndex] = currentMainReelId;
+            chartViewState.zoomLevel = 1; chartViewState.panOffset = 0;
             switchToReel(clickedReelId);
         }
 
@@ -2483,7 +2956,7 @@ cerr<!DOCTYPE html>
         // ═════════════════════════════════════════════════════════════════════════
         document.addEventListener('DOMContentLoaded', function() {
             console.log('═══════════════════════════════════════════════════════');
-            console.log('📊 Guidebook Module v3.0 — FULL REAL-TIME (Polygon Pro)');
+            console.log('📊 Guidebook Module v4.1 — CANDLESTICK + REAL NBBO BOOKMAP (Polygon Pro)');
             console.log('═══════════════════════════════════════════════════════');
 
             // 1. Detectar horario de mercado
@@ -2543,7 +3016,13 @@ cerr<!DOCTYPE html>
                 // 9. 🔄 v3.0: REST Polling como fallback (reemplaza startPriceSimulation)
                 evaluatePollingNeed();
 
-                // 10. Redibujar charts periódicamente (para incorporar nuevos datos WS)
+                // 10. 📊 v4.1: Order Book Heatmap (NBBO-anchored)
+                setTimeout(function() { startOBUpdates(); }, 2500);
+
+                // 11. 📊 v4.1: Zoom/Pan/Crosshair en main chart
+                setupMainChartInteractions();
+
+                // 12. Redibujar charts periódicamente
                 setInterval(function() {
                     drawAllCharts();
                 }, 2000);
@@ -2554,7 +3033,7 @@ cerr<!DOCTYPE html>
                 }, marketStatus.checkInterval);
 
                 console.log('═══════════════════════════════════════════════════════');
-                console.log('📊 Guidebook v3.0 — FULL REAL-TIME ✅');
+                console.log('📊 Guidebook v4.1 — FULL REAL-TIME + NBBO BOOKMAP ✅');
                 console.log('  ✅ Historial de precios: DATOS REALES (Polygon Aggs)');
                 console.log('  ✅ Precio actual: SNAPSHOT API (no /prev)');
                 console.log('  ✅ Tiempo real: WEBSOCKET (Polygon Pro)');
@@ -2565,6 +3044,10 @@ cerr<!DOCTYPE html>
                 console.log('  ❌ ELIMINADO: startPriceSimulation (Math.random)');
                 console.log('  ❌ ELIMINADO: fetchLastPrice (/prev endpoint)');
                 console.log('  💬 Mini-chat flotante: ACTIVO (feature social)');
+                console.log('  🕯️ Candlestick charts: OHLC + Volume bars');
+                console.log('  📊 Order Book: v4.1 NBBO-ANCHORED (Polygon Q.*/XQ.*)');
+                console.log('  🔍 Zoom/Pan: scroll + drag en main chart');
+                console.log('  ⇄ Bidirectional swap: main ⇄ small reels');
                 console.log('═══════════════════════════════════════════════════════');
             }, 100);
         });

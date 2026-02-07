@@ -1,0 +1,17 @@
+{
+  "name": "don-trading-web",
+  "version": "1.0.0",
+  "description": "DON Trading Journal — Firebase Hosting + Cloud Functions",
+  "private": true,
+  "scripts": {
+    "dev": "firebase emulators:start",
+    "deploy": "firebase deploy",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:rules": "firebase deploy --only firestore:rules",
+    "logs": "firebase functions:log"
+  },
+  "devDependencies": {
+    "firebase-tools": "^13.6.0"
+  }
+}

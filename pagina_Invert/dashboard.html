@@ -270,26 +270,29 @@
             { id: "longterm", title: "Long Term Investing", subtitle: "Keep investments for at least a year: stocks, bonds, real estate.", icon: "longterm", accentColor: "#22c55e", cta: "Show more", bullets: ["Dashboard rooted in financial info", "Prioritize news feed with custom notifications"] }
         ];
 
-        var TAB_CONTENT_MAP = { guidebook:{emoji:"📖",desc:"Interactive guides and tutorials"},options:{emoji:"📊",desc:"Real-time options flow scanner"},swing:{emoji:"📈",desc:"Multi-timeframe momentum scanner"},daytrading:{emoji:"⚡",desc:"Level 2 data and position tracker"},longterm:{emoji:"🏦",desc:"Fundamental analysis dashboard"},newsfeed:{emoji:"📰",desc:"Curated financial news"},details:{emoji:"🔍",desc:"Deep-dive company analysis"},calendar:{emoji:"📅",desc:"Earnings calendar and events"},watchlist:{emoji:"👁",desc:"Custom watchlists with alerts"},movers:{emoji:"🚀",desc:"Top gainers and losers"},signals:{emoji:"📡",desc:"AI-generated trading signals"},scanner:{emoji:"🎯",desc:"Custom stock screener"},chart:{emoji:"📉",desc:"Advanced charting tools"},insiders:{emoji:"👥",desc:"Insider trading activity"},graph:{emoji:"🔗",desc:"Company relationship maps"},welcome:{emoji:"🏠",desc:"Welcome to your dashboard"} };
+        var TAB_CONTENT_MAP = { guidebook:{emoji:"📖",desc:"Interactive guides and tutorials"},options:{emoji:"📊",desc:"Real-time options flow scanner"},swing:{emoji:"📈",desc:"Multi-timeframe momentum scanner"},daytrading:{emoji:"⚡",desc:"Level 2 data and position tracker"},longterm:{emoji:"🏦",desc:"Fundamental analysis dashboard"},create_workspace:{emoji:"🛠️",desc:"Build a convenient dashboard for your goals"},brokerage:{emoji:"🔗",desc:"Connect your brokers portfolio to DonTrading"},newsfeed:{emoji:"📰",desc:"Curated financial news"},details:{emoji:"🔍",desc:"Deep-dive company analysis"},calendar:{emoji:"📅",desc:"Earnings calendar and events"},watchlist:{emoji:"👁",desc:"Custom watchlists with alerts"},movers:{emoji:"🚀",desc:"Top gainers and losers"},signals:{emoji:"📡",desc:"AI-generated trading signals"},scanner:{emoji:"🎯",desc:"Custom stock screener"},chart:{emoji:"📉",desc:"Advanced charting tools"},insiders:{emoji:"👥",desc:"Insider trading activity"},graph:{emoji:"🔗",desc:"Company relationship maps"},welcome:{emoji:"🏠",desc:"Welcome to your dashboard"} };
 
         var MODULE_FILES = {
             // ── Welcome Cards ──
-            guidebook:  'modules/guidebook.html',
-            options:    'modules/options.html',
-            swing:      'modules/swing.html',
-            daytrading: 'modules/daytrading.html',
-            longterm:   'modules/longterm.html',
+            guidebook:        'modules/guidebook.html',
+            options:          'modules/options.html',
+            swing:            'modules/swing.html',
+            daytrading:       'modules/day_trading.html',
+            longterm:         'modules/long_term.html',
+            // ── Action Cards ──
+            create_workspace: 'modules/create_workspace.html',
+            brokerage:        'modules/Brokerage.html',
             // ── Sidebar Items ──
-            newsfeed:   'modules/newsfeed.html',
-            details:    'modules/details.html',
-            calendar:   'modules/calendar.html',
-            watchlist:  'modules/watchlist.html',
-            movers:     'modules/movers.html',
-            signals:    'modules/signals.html',
-            scanner:    'modules/scanner.html',
-            chart:      'modules/chart.html',
-            insiders:   'modules/insiders.html',
-            graph:      'modules/graph.html'
+            newsfeed:         'modules/newsfeed.html',
+            details:          'modules/details.html',
+            calendar:         'modules/calendar.html',
+            watchlist:        'modules/watchlist.html',
+            movers:           'modules/movers.html',
+            signals:          'modules/signals.html',
+            scanner:          'modules/scanner.html',
+            chart:            'modules/chart.html',
+            insiders:         'modules/insiders.html',
+            graph:            'modules/graph.html'
         };
 
         // ═════════════════════════════════════════════════════════════════════════
@@ -428,7 +431,7 @@
         function renderWelcomePage() {
             var h='';
             for(var i=0;i<WELCOME_CARDS_DATA.length;i++){var c=WELCOME_CARDS_DATA[i],b='';for(var j=0;j<c.bullets.length;j++)b+='<li class="card-feature"><span class="feature-bullet" style="background-color:'+c.accentColor+'"></span>'+c.bullets[j]+'</li>';h+='<div class="welcome-card" data-card-id="'+c.id+'" data-card-title="'+c.title+'" style="border-top:2px solid '+hexToRgba(c.accentColor,0.15)+'"><div class="card-header"><div class="card-icon-container" style="background-color:'+hexToRgba(c.accentColor,0.07)+'">'+getCardIconSvg(c.icon,c.accentColor)+'</div><h3 class="card-title">'+c.title+'</h3></div><p class="card-description">'+c.subtitle+'</p><ul class="card-features">'+b+'</ul><div class="card-cta"><span class="cta-text" style="color:'+c.accentColor+'">'+c.cta+'</span><span class="cta-arrow" style="color:'+c.accentColor+'">→</span></div></div>';}
-            return '<div class="dashboard-home"><div class="welcome-header"><h1 class="welcome-title">Welcome, <span class="brand-name" id="welcomeUserName">Trader</span> <span class="pro-label">Pro</span></h1><p class="welcome-subtitle">Choose the type of trading that suits you best</p></div><div class="main-search"><div class="main-search-container"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.35-4.35"></path></svg><span class="main-search-text">Search a...</span></div></div><div class="welcome-cards-grid">'+h+'</div><div class="action-cards-grid"><div class="action-card"><h3 class="action-title">Create New Workspace</h3><p class="action-description">Build a convenient dashboard for your goals</p><button class="action-button">CREATE WORKSPACE</button></div><div class="action-card"><h3 class="action-title">Link Brokerage Portfolio</h3><p class="action-description">Connect your brokers portfolio to DonTrading</p><button class="action-button">LINK BROKERAGE</button></div></div></div>';
+            return '<div class="dashboard-home"><div class="welcome-header"><h1 class="welcome-title">Welcome, <span class="brand-name" id="welcomeUserName">Trader</span> <span class="pro-label">Pro</span></h1><p class="welcome-subtitle">Choose the type of trading that suits you best</p></div><div class="main-search"><div class="main-search-container"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.35-4.35"></path></svg><span class="main-search-text">Search a...</span></div></div><div class="welcome-cards-grid">'+h+'</div><div class="action-cards-grid"><div class="action-card"><h3 class="action-title">Create New Workspace</h3><p class="action-description">Build a convenient dashboard for your goals</p><button class="action-button" data-action-id="create_workspace" data-action-title="Create Workspace">CREATE WORKSPACE</button></div><div class="action-card"><h3 class="action-title">Link Brokerage Portfolio</h3><p class="action-description">Connect your brokers portfolio to DonTrading</p><button class="action-button" data-action-id="brokerage" data-action-title="Link Brokerage">LINK BROKERAGE</button></div></div></div>';
         }
 
         function renderTabContent(t,id){var c=TAB_CONTENT_MAP[id]||{emoji:"📋",desc:"Content for "+t};return '<div class="tab-content"><span class="tab-emoji">'+c.emoji+'</span><h2 class="tab-content-title">'+t+'</h2><p class="tab-content-description">'+c.desc+'</p><div class="status-indicator"><div class="pulse-dot"></div><span class="status-text">Module Ready</span></div></div>';}
@@ -440,7 +443,7 @@
 
         function updateContent(){var ca=document.getElementById('contentArea'),gc=document.getElementById('globalChat'),at=null;for(var i=0;i<appState.tabs.length;i++){if(appState.tabs[i].id===appState.activeTabId){at=appState.tabs[i];break;}}if(!at){ca.innerHTML='<div class="tab-content">No tab selected</div>';return;}if(at.contentId==='welcome'){ca.innerHTML=renderWelcomePage();setupWelcomeCardListeners();gc.style.display='flex';}else if(MODULE_FILES[at.contentId]){ca.innerHTML='<iframe class="module-iframe" src="'+MODULE_FILES[at.contentId]+'"></iframe>';gc.style.display='none';}else{ca.innerHTML=renderTabContent(at.title,at.contentId);gc.style.display='none';}}
 
-        function setupWelcomeCardListeners(){var wc=document.querySelectorAll('.welcome-card');for(var i=0;i<wc.length;i++){(function(c){c.addEventListener('click',function(){openNewTab(c.getAttribute('data-card-id'),c.getAttribute('data-card-title'));});})(wc[i]);}}
+        function setupWelcomeCardListeners(){var wc=document.querySelectorAll('.welcome-card');for(var i=0;i<wc.length;i++){(function(c){c.addEventListener('click',function(){openNewTab(c.getAttribute('data-card-id'),c.getAttribute('data-card-title'));});})(wc[i]);}var ab=document.querySelectorAll('.action-button[data-action-id]');for(var j=0;j<ab.length;j++){(function(b){b.addEventListener('click',function(){openNewTab(b.getAttribute('data-action-id'),b.getAttribute('data-action-title'));});})(ab[j]);}}
         function updateSidebar(){var si=document.querySelectorAll('.sidebar-item');for(var i=0;i<si.length;i++){si[i].classList.remove('active');if(si[i].getAttribute('data-id')===appState.activeSidebarItem)si[i].classList.add('active');}}
         function openNewTab(cid,t){for(var i=0;i<appState.tabs.length;i++){if(appState.tabs[i].contentId===cid){setActiveTab(appState.tabs[i].id);return;}}var nid='tab-'+appState.nextTabId;appState.tabs.push({id:nid,title:t,contentId:cid,closable:true});appState.activeTabId=nid;appState.nextTabId++;renderTabs();updateContent();}
         function closeTab(tid){var idx=-1;for(var i=0;i<appState.tabs.length;i++){if(appState.tabs[i].id===tid){idx=i;break;}}if(idx===-1||appState.tabs[idx].closable===false)return;appState.tabs.splice(idx,1);if(appState.activeTabId===tid){appState.activeTabId=appState.tabs.length>0?appState.tabs[0].id:"welcome";if(appState.tabs.length===0)appState.tabs.push({id:"welcome",title:"Welcome Page",contentId:"welcome",closable:false});}renderTabs();updateContent();}
