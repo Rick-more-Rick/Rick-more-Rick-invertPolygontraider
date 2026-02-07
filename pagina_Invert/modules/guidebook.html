@@ -517,41 +517,164 @@
         .main-reel-change.positive { color: var(--positive); }
         .main-reel-change.negative { color: var(--negative); }
 
-        .chart-internal-menu {
+        /* ── v4.2: MODULE TAB NAVIGATION ── */
+        .module-tab-nav {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 8px 12px;
+            gap: 0;
             background: var(--bg-card);
-            border-radius: 8px;
             border: 1px solid var(--border);
-            margin-bottom: 12px;
+            border-radius: 10px 10px 0 0;
+            margin-bottom: 0;
             flex-shrink: 0;
-            flex-wrap: wrap;
+            overflow-x: auto;
+            scrollbar-width: none;
         }
+        .module-tab-nav::-webkit-scrollbar { display: none; }
 
-        .chart-menu-btn {
-            padding: 6px 12px;
+        .module-tab-btn {
+            padding: 10px 14px;
             background: transparent;
-            border: 1px solid transparent;
-            border-radius: 6px;
-            color: var(--text-secondary);
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-muted);
             font-size: 11px;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            position: relative;
+        }
+        .module-tab-btn:hover {
+            color: var(--text-secondary);
+            background: rgba(255,255,255,0.03);
+        }
+        .module-tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+            background: rgba(245,158,11,0.06);
+        }
+        .module-tab-btn .tab-icon { font-size: 12px; }
+        .module-tab-btn .tab-label { font-size: 10px; letter-spacing: 0.3px; }
+
+        .module-tab-divider {
+            width: 1px; height: 20px;
+            background: var(--border);
+            margin: 0 2px;
+            flex-shrink: 0;
         }
 
-        .chart-menu-btn:hover { background: var(--bg-tab-active); color: var(--text-primary); }
-        .chart-menu-btn.active { background: var(--accent); color: var(--bg-primary); font-weight: 700; }
-        .chart-menu-divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+        /* ── TAB PANELS ── */
+        .module-tab-panels {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            background: var(--bg-card);
+        }
+        .module-tab-panel {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+        .module-tab-panel.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── CHART TAB: chart fills + timeframe bar at bottom ── */
+        .tab-chart-wrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-timeframe-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 6px 12px;
+            background: linear-gradient(180deg, rgba(17,24,39,0.0) 0%, rgba(17,24,39,0.95) 40%, rgba(17,24,39,1) 100%);
+            border-top: 1px solid rgba(30,41,59,0.5);
+            flex-shrink: 0;
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            z-index: 15;
+        }
+
+        .tf-btn {
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(30,41,59,0.6);
+            border-radius: 5px;
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-variant-numeric: tabular-nums;
+        }
+        .tf-btn:hover {
+            background: rgba(245,158,11,0.1);
+            border-color: var(--accent-soft);
+            color: var(--text-secondary);
+        }
+        .tf-btn.active {
+            background: rgba(245,158,11,0.18);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: 700;
+        }
+        .tf-divider {
+            width: 1px; height: 14px;
+            background: rgba(30,41,59,0.6);
+            margin: 0 3px;
+        }
+
+        /* ── PLACEHOLDER PANELS (News, Orders, etc.) ── */
+        .tab-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 12px;
+            color: var(--text-muted);
+            padding: 40px;
+        }
+        .tab-placeholder-icon { font-size: 48px; opacity: 0.3; }
+        .tab-placeholder-title {
+            font-size: 16px; font-weight: 700;
+            color: var(--text-secondary);
+        }
+        .tab-placeholder-desc {
+            font-size: 12px; color: var(--text-muted);
+            text-align: center; max-width: 320px; line-height: 1.6;
+        }
+        .tab-placeholder-badge {
+            font-size: 9px; font-weight: 700;
+            padding: 4px 12px; border-radius: 20px;
+            background: rgba(245,158,11,0.1);
+            color: var(--accent-soft);
+            border: 1px solid rgba(245,158,11,0.2);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
 
         /* ── v4.1: MAIN CHART + ZOOM/PAN + NBBO ── */
         .main-chart-container {
             flex: 1;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            background-color: var(--bg-card);
+            border: none;
+            border-radius: 0;
+            background-color: transparent;
             position: relative;
             min-height: 200px;
             overflow: hidden;
@@ -561,7 +684,7 @@
         .main-chart-container.panning { cursor: grabbing; }
 
         .chart-zoom-controls {
-            position: absolute; bottom: 10px; left: 10px;
+            position: absolute; bottom: 42px; left: 10px;
             display: flex; gap: 4px; z-index: 20;
         }
         .chart-zoom-btn {
@@ -594,7 +717,7 @@
         }
 
         .nbbo-status {
-            position: absolute; bottom: 10px; right: 10px;
+            position: absolute; bottom: 42px; right: 10px;
             padding: 3px 8px; border-radius: 8px;
             background: rgba(10,14,23,0.8); border: 1px solid var(--border);
             font-size: 9px; font-weight: 600; color: var(--text-muted);
@@ -783,6 +906,7 @@
                 </div>
             </div>
         </div>
+
         <!-- ═══════════════════════════════════════════════════════════════════════ -->
         <!-- CONT 3: GRÁFICA GRANDE + CHAT (ORIGINAL, sin cambios)                 -->
         <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -800,38 +924,132 @@
                         </div>
                     </div>
                 </div>
-                <!--============================-->
-                <div class="chart-internal-menu">
-                    <button class="chart-menu-btn active" data-interval="1m">1m</button>
-                    <button class="chart-menu-btn" data-interval="5m">5m</button>
-                    <button class="chart-menu-btn" data-interval="15m">15m</button>
-                    <button class="chart-menu-btn" data-interval="1h">1H</button>
-                    <button class="chart-menu-btn" data-interval="1d">1D</button>
-                    <span class="chart-menu-divider"></span>
-                    <button class="chart-menu-btn" data-interval="1w">1W</button>
-                    <button class="chart-menu-btn" data-interval="1M">1M</button>
+                <!-- ═══ v4.2: MODULE TAB NAVIGATION ═══ -->
+                <div class="module-tab-nav" id="module-tab-nav">
+                    <button class="module-tab-btn active" data-tab="chart" onclick="switchModuleTab('chart')">
+                        <span class="tab-icon">📊</span><span class="tab-label">Chart</span>
+                    </button>
+                    <button class="module-tab-btn" data-tab="news" onclick="switchModuleTab('news')">
+                        <span class="tab-icon">📰</span><span class="tab-label">News</span>
+                    </button>
+                    <button class="module-tab-btn" data-tab="orders" onclick="switchModuleTab('orders')">
+                        <span class="tab-icon">📋</span><span class="tab-label">Orders</span>
+                    </button>
+                    <button class="module-tab-btn" data-tab="analysis" onclick="switchModuleTab('analysis')">
+                        <span class="tab-icon">📈</span><span class="tab-label">Analysis</span>
+                    </button>
+                    <span class="module-tab-divider"></span>
+                    <button class="module-tab-btn" data-tab="signals" onclick="switchModuleTab('signals')">
+                        <span class="tab-icon">💡</span><span class="tab-label">Signals</span>
+                    </button>
+                    <button class="module-tab-btn" data-tab="fundamentals" onclick="switchModuleTab('fundamentals')">
+                        <span class="tab-icon">📑</span><span class="tab-label">Fundamentals</span>
+                    </button>
+                    <button class="module-tab-btn" data-tab="settings" onclick="switchModuleTab('settings')">
+                        <span class="tab-icon">⚙️</span><span class="tab-label">Settings</span>
+                    </button>
                 </div>
-                <!--============================-->
-                <div class="main-chart-container" id="main-chart-container">
-                    <canvas id="main-chart"></canvas>
-                    <div class="ws-status-badge connected">
-                        <span class="ws-status-dot"></span>
-                        <span>En Vivo</span>
+
+                <!-- ═══ TAB PANELS CONTAINER ═══ -->
+                <div class="module-tab-panels" id="module-tab-panels">
+
+                    <!-- ── TAB: CHART (active by default) ── -->
+                    <div class="module-tab-panel active" id="tab-panel-chart" data-panel="chart">
+                        <div class="tab-chart-wrapper">
+                            <div class="main-chart-container" id="main-chart-container">
+                                <canvas id="main-chart"></canvas>
+                                <div class="ws-status-badge connected">
+                                    <span class="ws-status-dot"></span>
+                                    <span>En Vivo</span>
+                                </div>
+                                <div class="chart-price-badge positive" id="chart-price-badge">$0.00</div>
+                                <div class="chart-crosshair-info" id="chart-crosshair-info"></div>
+                                <div class="chart-zoom-controls">
+                                    <button class="chart-zoom-btn" onclick="chartZoom(1)" title="Zoom In">+</button>
+                                    <button class="chart-zoom-btn" onclick="chartZoom(-1)" title="Zoom Out">−</button>
+                                    <button class="chart-zoom-btn" onclick="chartZoomReset()" title="Reset" style="font-size:11px;">⟲</button>
+                                </div>
+                                <div class="nbbo-status" id="nbbo-status">NBBO: --</div>
+                                <div class="main-chart-drag-handle" id="main-drag-handle" draggable="true">
+                                    <div class="drag-dots"><span></span><span></span></div>
+                                    ⇄ Arrastrar a reel
+                                </div>
+                            </div>
+                            <!-- Timeframe bar fija al fondo del chart -->
+                            <div class="chart-timeframe-bar" id="chart-timeframe-bar">
+                                <button class="tf-btn active" data-tf="1" data-tf-unit="minute">1m</button>
+                                <button class="tf-btn" data-tf="5" data-tf-unit="minute">5m</button>
+                                <button class="tf-btn" data-tf="15" data-tf-unit="minute">15m</button>
+                                <button class="tf-btn" data-tf="1" data-tf-unit="hour">1H</button>
+                                <button class="tf-btn" data-tf="1" data-tf-unit="day">1D</button>
+                                <span class="tf-divider"></span>
+                                <button class="tf-btn" data-tf="1" data-tf-unit="week">1W</button>
+                                <button class="tf-btn" data-tf="1" data-tf-unit="month">1M</button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="chart-price-badge positive" id="chart-price-badge">$0.00</div>
-                    <div class="chart-crosshair-info" id="chart-crosshair-info"></div>
-                    <div class="chart-zoom-controls">
-                        <button class="chart-zoom-btn" onclick="chartZoom(1)" title="Zoom In">+</button>
-                        <button class="chart-zoom-btn" onclick="chartZoom(-1)" title="Zoom Out">−</button>
-                        <button class="chart-zoom-btn" onclick="chartZoomReset()" title="Reset" style="font-size:11px;">⟲</button>
+
+                    <!-- ── TAB: NEWS ── -->
+                    <div class="module-tab-panel" id="tab-panel-news" data-panel="news">
+                        <div class="tab-placeholder">
+                            <span class="tab-placeholder-icon">📰</span>
+                            <span class="tab-placeholder-title">News Feed</span>
+                            <span class="tab-placeholder-desc">Noticias en tiempo real del activo seleccionado. Headlines, sentiment analysis y breaking news directamente en tu terminal.</span>
+                            <span class="tab-placeholder-badge">Próximamente</span>
+                        </div>
                     </div>
-                    <div class="nbbo-status" id="nbbo-status">NBBO: --</div>
-                    <div class="main-chart-drag-handle" id="main-drag-handle" draggable="true">
-                        <div class="drag-dots"><span></span><span></span></div>
-                        ⇄ Arrastrar a reel
+
+                    <!-- ── TAB: ORDERS ── -->
+                    <div class="module-tab-panel" id="tab-panel-orders" data-panel="orders">
+                        <div class="tab-placeholder">
+                            <span class="tab-placeholder-icon">📋</span>
+                            <span class="tab-placeholder-title">Order Book</span>
+                            <span class="tab-placeholder-desc">Visualización detallada del libro de órdenes, historial de trades y posiciones abiertas.</span>
+                            <span class="tab-placeholder-badge">Próximamente</span>
+                        </div>
                     </div>
+
+                    <!-- ── TAB: ANALYSIS ── -->
+                    <div class="module-tab-panel" id="tab-panel-analysis" data-panel="analysis">
+                        <div class="tab-placeholder">
+                            <span class="tab-placeholder-icon">📈</span>
+                            <span class="tab-placeholder-title">Technical Analysis</span>
+                            <span class="tab-placeholder-desc">Indicadores técnicos, patrones de velas, niveles de soporte/resistencia y más herramientas de análisis.</span>
+                            <span class="tab-placeholder-badge">Próximamente</span>
+                        </div>
+                    </div>
+
+                    <!-- ── TAB: SIGNALS ── -->
+                    <div class="module-tab-panel" id="tab-panel-signals" data-panel="signals">
+                        <div class="tab-placeholder">
+                            <span class="tab-placeholder-icon">💡</span>
+                            <span class="tab-placeholder-title">Trading Signals</span>
+                            <span class="tab-placeholder-desc">Alertas inteligentes, señales de entrada/salida y notificaciones basadas en tus estrategias configuradas.</span>
+                            <span class="tab-placeholder-badge">Próximamente</span>
+                        </div>
+                    </div>
+
+                    <!-- ── TAB: FUNDAMENTALS ── -->
+                    <div class="module-tab-panel" id="tab-panel-fundamentals" data-panel="fundamentals">
+                        <div class="tab-placeholder">
+                            <span class="tab-placeholder-icon">📑</span>
+                            <span class="tab-placeholder-title">Fundamentals</span>
+                            <span class="tab-placeholder-desc">Datos fundamentales: earnings, revenue, P/E ratio, balance sheets y métricas financieras clave del activo.</span>
+                            <span class="tab-placeholder-badge">Próximamente</span>
+                        </div>
+                    </div>
+
+                    <!-- ── TAB: SETTINGS ── -->
+                    <div class="module-tab-panel" id="tab-panel-settings" data-panel="settings">
+                        <div class="tab-placeholder">
+                            <span class="tab-placeholder-icon">⚙️</span>
+                            <span class="tab-placeholder-title">Chart Settings</span>
+                            <span class="tab-placeholder-desc">Personaliza colores, indicadores, tipo de gráfico, temas y preferencias de visualización del terminal.</span>
+                            <span class="tab-placeholder-badge">Próximamente</span>
+                        </div>
+                    </div>
+
                 </div>
-                <!--============================-->
             </div>
 
             <div class="cont3-chat-section">
@@ -853,6 +1071,7 @@
             </div>
         </div>
     </div>
+
     <!-- ═══════════════════════════════════════════════════════════════════════════ -->
     <!-- ✅ REEL SELECTOR MODAL (elegir en cuál reel colocar el activo)             -->
     <!-- ═══════════════════════════════════════════════════════════════════════════ -->
@@ -2246,8 +2465,20 @@
                 updateReelData(REELS_CONFIG[i].id, REELS_CONFIG[i]);
             }
 
-            drawMainChart();
+            // v4.2: Only redraw if chart tab is active
+            if (activeModuleTab === 'chart') {
+                drawMainChart();
+            }
             updateMarketStatusUI();
+
+            // Refresh NBBO display for new active ticker
+            var activeTicker = reelTickerMap[reelId];
+            if (activeTicker && realNBBO[activeTicker]) {
+                updateNBBODisplay(activeTicker);
+            } else {
+                var nbboEl = document.getElementById('nbbo-status');
+                if (nbboEl) { nbboEl.className = 'nbbo-status'; nbboEl.textContent = 'NBBO: --'; }
+            }
 
             // ✅ v2.1: Refrescar mini-chats al cambiar reels
             setTimeout(function() {
@@ -2911,15 +3142,51 @@
             if (sendBtn) { sendBtn.addEventListener('click', function() { sendUserChatMessage(); }); }
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // 📐 v4.2: MODULE TAB SYSTEM
+        // ═══════════════════════════════════════════════════════════════
+
+        var activeModuleTab = 'chart';
+
+        function switchModuleTab(tabId) {
+            if (activeModuleTab === tabId) return;
+            activeModuleTab = tabId;
+
+            // Update tab buttons
+            var tabs = document.querySelectorAll('.module-tab-btn');
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === tabId);
+            }
+
+            // Update panels
+            var panels = document.querySelectorAll('.module-tab-panel');
+            for (var j = 0; j < panels.length; j++) {
+                panels[j].classList.toggle('active', panels[j].getAttribute('data-panel') === tabId);
+            }
+
+            // Redraw chart when switching back to chart tab
+            if (tabId === 'chart') {
+                setTimeout(function() {
+                    drawMainChart();
+                }, 50);
+            }
+
+            console.log('[Tabs] Switched to: ' + tabId);
+        }
+
         function setupMenuInteractions() {
-            var intervalBtns = document.querySelectorAll('[data-interval]');
-            for (var i = 0; i < intervalBtns.length; i++) {
+            // v4.2: Timeframe buttons (visual only for now)
+            var tfBtns = document.querySelectorAll('.tf-btn');
+            for (var i = 0; i < tfBtns.length; i++) {
                 (function(btn) {
                     btn.addEventListener('click', function() {
-                        for (var j = 0; j < intervalBtns.length; j++) { intervalBtns[j].classList.remove('active'); }
+                        for (var j = 0; j < tfBtns.length; j++) { tfBtns[j].classList.remove('active'); }
                         btn.classList.add('active');
+                        var tf = btn.getAttribute('data-tf');
+                        var unit = btn.getAttribute('data-tf-unit');
+                        console.log('[Timeframe] Selected: ' + tf + ' ' + unit + ' (visual)');
                     });
-                })(intervalBtns[i]);
+                })(tfBtns[i]);
             }
         }
 
@@ -2956,7 +3223,7 @@
         // ═════════════════════════════════════════════════════════════════════════
         document.addEventListener('DOMContentLoaded', function() {
             console.log('═══════════════════════════════════════════════════════');
-            console.log('📊 Guidebook Module v4.1 — CANDLESTICK + REAL NBBO BOOKMAP (Polygon Pro)');
+            console.log('📊 Guidebook Module v4.2 — TAB SYSTEM + CANDLESTICK + REAL NBBO BOOKMAP');
             console.log('═══════════════════════════════════════════════════════');
 
             // 1. Detectar horario de mercado
@@ -3033,7 +3300,7 @@
                 }, marketStatus.checkInterval);
 
                 console.log('═══════════════════════════════════════════════════════');
-                console.log('📊 Guidebook v4.1 — FULL REAL-TIME + NBBO BOOKMAP ✅');
+                console.log('📊 Guidebook v4.2 — TAB NAV + FULL REAL-TIME + NBBO BOOKMAP ✅');
                 console.log('  ✅ Historial de precios: DATOS REALES (Polygon Aggs)');
                 console.log('  ✅ Precio actual: SNAPSHOT API (no /prev)');
                 console.log('  ✅ Tiempo real: WEBSOCKET (Polygon Pro)');
@@ -3048,6 +3315,8 @@
                 console.log('  📊 Order Book: v4.1 NBBO-ANCHORED (Polygon Q.*/XQ.*)');
                 console.log('  🔍 Zoom/Pan: scroll + drag en main chart');
                 console.log('  ⇄ Bidirectional swap: main ⇄ small reels');
+                console.log('  📐 Tab navigation: Chart | News | Orders | Analysis | Signals | Fundamentals | Settings');
+                console.log('  ⏱️ Timeframe bar: fixed bottom (1m/5m/15m/1H/1D/1W/1M)');
                 console.log('═══════════════════════════════════════════════════════');
             }, 100);
         });
