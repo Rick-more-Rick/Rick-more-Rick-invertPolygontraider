@@ -1063,7 +1063,7 @@
                 console.log('📧 [RESEND] Enviando a: ' + user.email);
 
                 await user.sendEmailVerification({
-                    url: window.location.origin + '/dashboard.html',
+                    url: window.location.origin + '/login.html',
                     handleCodeInApp: false
                 });
 
@@ -1357,7 +1357,7 @@
                 try {
                     console.log('📧 [REGISTER] Enviando email de verificación a: ' + email + '...');
                     await user.sendEmailVerification({
-                        url: window.location.origin + '/dashboard.html',
+                        url: window.location.origin + '/login.html',
                         handleCodeInApp: false
                     });
                     emailSent = true;
@@ -1385,7 +1385,7 @@
                     console.warn('⚠️ [REGISTER] Reintentando envío de email...');
                     try {
                         await user.sendEmailVerification({
-                            url: window.location.origin + '/dashboard.html',
+                            url: window.location.origin + '/login.html',
                             handleCodeInApp: false
                         });
                         console.log('✅ [REGISTER] Email enviado en segundo intento');
