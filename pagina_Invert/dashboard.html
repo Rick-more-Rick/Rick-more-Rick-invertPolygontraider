@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DONTRADING - Investment Dashboard v2.1</title>
+    <!-- Firebase SDKs (misma versión que login.html) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -30,6 +33,30 @@
         .sidebar-item.active .sidebar-icon { stroke: var(--accent); }
         .sidebar-label { font-size: 9px; font-weight: 400; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
         .sidebar-item.active .sidebar-label { font-weight: 600; color: var(--accent); }
+
+        /* ── SIDEBAR PROFILE (reemplaza el logo DT) ── */
+        .sidebar-profile { padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+        .sidebar-avatar { width: 38px; height: 38px; border-radius: 12px; object-fit: cover; border: 2px solid var(--border); transition: all 0.2s ease; background-color: var(--bg-card); }
+        .sidebar-avatar:hover { border-color: var(--accent); box-shadow: 0 0 12px rgba(245, 158, 11, 0.25); }
+        .sidebar-avatar-fallback { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--accent-soft)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; color: var(--bg-primary); border: 2px solid var(--border); transition: all 0.2s ease; }
+        .sidebar-avatar-fallback:hover { border-color: var(--accent); box-shadow: 0 0 12px rgba(245, 158, 11, 0.25); }
+
+        /* ── PROFILE POPUP — position:fixed para evitar clipping del sidebar ── */
+        .profile-popup { display: none; position: fixed; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 0; min-width: 260px; z-index: 9999; box-shadow: 0 12px 40px rgba(0,0,0,0.5); overflow: hidden; }
+        .profile-popup.open { display: block; animation: popupSlideIn 0.2s ease; }
+        @keyframes popupSlideIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+        .profile-popup-header { padding: 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); background: rgba(245, 158, 11, 0.03); }
+        .profile-popup-avatar { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; border: 2px solid var(--accent); flex-shrink: 0; }
+        .profile-popup-avatar-fallback { width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-soft)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: var(--bg-primary); flex-shrink: 0; }
+        .profile-popup-info { min-width: 0; }
+        .profile-popup-name { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .profile-popup-email { font-size: 11px; color: var(--text-muted); word-break: break-all; margin-top: 2px; }
+        .profile-popup-actions { padding: 6px; }
+        .profile-popup-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: none; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 13px; font-weight: 500; border-radius: 8px; cursor: pointer; transition: all 0.15s ease; }
+        .profile-popup-btn:hover { background: rgba(239, 68, 68, 0.08); color: var(--negative); }
+        .profile-popup-btn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.8; fill: none; flex-shrink: 0; }
+        .profile-popup-overlay { display: none; position: fixed; inset: 0; z-index: 9998; }
+        .profile-popup-overlay.open { display: block; }
 
         /* ── MAIN CONTENT ── */
         .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -149,9 +176,14 @@
     </style>
 </head>
 <body>
+    <!--==================================-->
     <div class="app-container">
         <div class="sidebar">
-            <div class="sidebar-logo"><div class="logo-container">DT</div></div>
+            <!-- ═══ PROFILE AVATAR — solo la imagen, SIN popup adentro ═══ -->
+            <div class="sidebar-profile" id="sidebarProfile">
+                <div class="sidebar-avatar-fallback" id="avatarFallback">DT</div>
+                <img class="sidebar-avatar" id="avatarImg" style="display:none;" alt="Avatar" referrerpolicy="no-referrer">
+            </div>
             <div class="sidebar-divider"></div>
             <div class="sidebar-item" data-id="newsfeed" data-label="Newsfeed" title="Newsfeed"><svg class="sidebar-icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h4"></path><path d="M8 12h8"></path><path d="M8 16h6"></path></svg><span class="sidebar-label">Newsfeed</span></div>
             <div class="sidebar-item" data-id="details" data-label="Details" title="Details"><svg class="sidebar-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="M16.5 16.5L21 21"></path></svg><span class="sidebar-label">Details</span></div>
@@ -203,6 +235,29 @@
         </div>
     </div>
 
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- PROFILE POPUP + OVERLAY — FUERA del sidebar (a nivel de body)        -->
+    <!-- Esto evita que el overflow:auto del sidebar lo recorte/oculte        -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div class="profile-popup-overlay" id="profileOverlay"></div>
+    <div class="profile-popup" id="profilePopup">
+        <div class="profile-popup-header">
+            <div class="profile-popup-avatar-fallback" id="popupAvatarFallback">DT</div>
+            <img class="profile-popup-avatar" id="popupAvatarImg" style="display:none;" alt="Avatar" referrerpolicy="no-referrer">
+            <div class="profile-popup-info">
+                <div class="profile-popup-name" id="popupName">—</div>
+                <div class="profile-popup-email" id="popupEmail">—</div>
+            </div>
+        </div>
+        <div class="profile-popup-actions">
+            <button class="profile-popup-btn" id="btnLogout">
+                <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                Cerrar sesión
+            </button>
+        </div>
+    </div>
+
+    <!--==================================-->
     <script>
         // ═════════════════════════════════════════════════════════════════════════
         // CONFIGURACIÓN
@@ -218,12 +273,23 @@
         var TAB_CONTENT_MAP = { guidebook:{emoji:"📖",desc:"Interactive guides and tutorials"},options:{emoji:"📊",desc:"Real-time options flow scanner"},swing:{emoji:"📈",desc:"Multi-timeframe momentum scanner"},daytrading:{emoji:"⚡",desc:"Level 2 data and position tracker"},longterm:{emoji:"🏦",desc:"Fundamental analysis dashboard"},newsfeed:{emoji:"📰",desc:"Curated financial news"},details:{emoji:"🔍",desc:"Deep-dive company analysis"},calendar:{emoji:"📅",desc:"Earnings calendar and events"},watchlist:{emoji:"👁",desc:"Custom watchlists with alerts"},movers:{emoji:"🚀",desc:"Top gainers and losers"},signals:{emoji:"📡",desc:"AI-generated trading signals"},scanner:{emoji:"🎯",desc:"Custom stock screener"},chart:{emoji:"📉",desc:"Advanced charting tools"},insiders:{emoji:"👥",desc:"Insider trading activity"},graph:{emoji:"🔗",desc:"Company relationship maps"},welcome:{emoji:"🏠",desc:"Welcome to your dashboard"} };
 
         var MODULE_FILES = {
-            guidebook: 'modules/guidebook.html'
-            // Agrega más módulos aquí cuando los separes:
-            // options: 'modules/options.html',
-            // swing: 'modules/swing.html',
-            // daytrading: 'modules/daytrading.html',
-            // longterm: 'modules/longterm.html',
+            // ── Welcome Cards ──
+            guidebook:  'modules/guidebook.html',
+            options:    'modules/options.html',
+            swing:      'modules/swing.html',
+            daytrading: 'modules/daytrading.html',
+            longterm:   'modules/longterm.html',
+            // ── Sidebar Items ──
+            newsfeed:   'modules/newsfeed.html',
+            details:    'modules/details.html',
+            calendar:   'modules/calendar.html',
+            watchlist:  'modules/watchlist.html',
+            movers:     'modules/movers.html',
+            signals:    'modules/signals.html',
+            scanner:    'modules/scanner.html',
+            chart:      'modules/chart.html',
+            insiders:   'modules/insiders.html',
+            graph:      'modules/graph.html'
         };
 
         // ═════════════════════════════════════════════════════════════════════════
@@ -362,7 +428,7 @@
         function renderWelcomePage() {
             var h='';
             for(var i=0;i<WELCOME_CARDS_DATA.length;i++){var c=WELCOME_CARDS_DATA[i],b='';for(var j=0;j<c.bullets.length;j++)b+='<li class="card-feature"><span class="feature-bullet" style="background-color:'+c.accentColor+'"></span>'+c.bullets[j]+'</li>';h+='<div class="welcome-card" data-card-id="'+c.id+'" data-card-title="'+c.title+'" style="border-top:2px solid '+hexToRgba(c.accentColor,0.15)+'"><div class="card-header"><div class="card-icon-container" style="background-color:'+hexToRgba(c.accentColor,0.07)+'">'+getCardIconSvg(c.icon,c.accentColor)+'</div><h3 class="card-title">'+c.title+'</h3></div><p class="card-description">'+c.subtitle+'</p><ul class="card-features">'+b+'</ul><div class="card-cta"><span class="cta-text" style="color:'+c.accentColor+'">'+c.cta+'</span><span class="cta-arrow" style="color:'+c.accentColor+'">→</span></div></div>';}
-            return '<div class="dashboard-home"><div class="welcome-header"><h1 class="welcome-title">Welcome to <span class="brand-name">DONTRADING</span> <span class="pro-label">Pro</span></h1><p class="welcome-subtitle">Choose the type of trading that suits you best</p></div><div class="main-search"><div class="main-search-container"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.35-4.35"></path></svg><span class="main-search-text">Search a...</span></div></div><div class="welcome-cards-grid">'+h+'</div><div class="action-cards-grid"><div class="action-card"><h3 class="action-title">Create New Workspace</h3><p class="action-description">Build a convenient dashboard for your goals</p><button class="action-button">CREATE WORKSPACE</button></div><div class="action-card"><h3 class="action-title">Link Brokerage Portfolio</h3><p class="action-description">Connect your brokers portfolio to DonTrading</p><button class="action-button">LINK BROKERAGE</button></div></div></div>';
+            return '<div class="dashboard-home"><div class="welcome-header"><h1 class="welcome-title">Welcome, <span class="brand-name" id="welcomeUserName">Trader</span> <span class="pro-label">Pro</span></h1><p class="welcome-subtitle">Choose the type of trading that suits you best</p></div><div class="main-search"><div class="main-search-container"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.35-4.35"></path></svg><span class="main-search-text">Search a...</span></div></div><div class="welcome-cards-grid">'+h+'</div><div class="action-cards-grid"><div class="action-card"><h3 class="action-title">Create New Workspace</h3><p class="action-description">Build a convenient dashboard for your goals</p><button class="action-button">CREATE WORKSPACE</button></div><div class="action-card"><h3 class="action-title">Link Brokerage Portfolio</h3><p class="action-description">Connect your brokers portfolio to DonTrading</p><button class="action-button">LINK BROKERAGE</button></div></div></div>';
         }
 
         function renderTabContent(t,id){var c=TAB_CONTENT_MAP[id]||{emoji:"📋",desc:"Content for "+t};return '<div class="tab-content"><span class="tab-emoji">'+c.emoji+'</span><h2 class="tab-content-title">'+t+'</h2><p class="tab-content-description">'+c.desc+'</p><div class="status-indicator"><div class="pulse-dot"></div><span class="status-text">Module Ready</span></div></div>';}
@@ -387,6 +453,163 @@
         function initializeApp(){renderTabs();updateContent();updateSidebar();initGlobalChat();var si=document.querySelectorAll('.sidebar-item');for(var i=0;i<si.length;i++){(function(it){it.addEventListener('click',function(){handleSidebarClick(it.getAttribute('data-id'),it.getAttribute('data-label'));});})(si[i]);}document.addEventListener('click',function(e){if(e.target.hasAttribute('data-tab-close')){e.stopPropagation();closeTab(e.target.getAttribute('data-tab-close'));}});document.getElementById('newTabButton').addEventListener('click',function(){openNewTab('welcome','New Tab');});}
 
         document.addEventListener('DOMContentLoaded',function(){console.log('🚀 DONTRADING v2.1 (Modular + Global Chat)');initializeApp();});
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // FIREBASE INIT + PERFIL DINÁMICO + LOGOUT
+        // ═════════════════════════════════════════════════════════════════════════
+
+        var firebaseConfig = {
+            apiKey: "AIzaSyAdKShZMYYdmZ3bkmaDWsEhsLsT0YIgz-8",
+            authDomain: "dontrading-pro.firebaseapp.com",
+            projectId: "dontrading-pro",
+            storageBucket: "dontrading-pro.firebasestorage.app",
+            messagingSenderId: "684854856085",
+            appId: "1:684854856085:web:fd18dc2c46ff13ea81ce9c",
+            measurementId: "G-FYNX14F2VY"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        var auth = firebase.auth();
+
+        // ── Poblar la UI con datos del usuario ──
+        function populateUserProfile(user) {
+            var displayName = user.displayName || user.email || 'Trader';
+            var email = user.email || '';
+            var photoURL = user.photoURL || '';
+            var firstName = displayName.split(' ')[0];
+            var initial = firstName.charAt(0).toUpperCase();
+
+            // ── Sidebar avatar ──
+            var avatarImg = document.getElementById('avatarImg');
+            var avatarFallback = document.getElementById('avatarFallback');
+
+            if (photoURL) {
+                avatarImg.src = photoURL;
+                avatarImg.style.display = 'block';
+                avatarFallback.style.display = 'none';
+                avatarImg.onerror = function() {
+                    avatarImg.style.display = 'none';
+                    avatarFallback.style.display = 'flex';
+                    avatarFallback.textContent = initial;
+                };
+            } else {
+                avatarImg.style.display = 'none';
+                avatarFallback.style.display = 'flex';
+                avatarFallback.textContent = initial;
+            }
+
+            // ── Popup avatar ──
+            var popupAvatarImg = document.getElementById('popupAvatarImg');
+            var popupAvatarFallback = document.getElementById('popupAvatarFallback');
+
+            if (photoURL) {
+                popupAvatarImg.src = photoURL;
+                popupAvatarImg.style.display = 'block';
+                popupAvatarFallback.style.display = 'none';
+                popupAvatarImg.onerror = function() {
+                    popupAvatarImg.style.display = 'none';
+                    popupAvatarFallback.style.display = 'flex';
+                    popupAvatarFallback.textContent = initial;
+                };
+            } else {
+                popupAvatarImg.style.display = 'none';
+                popupAvatarFallback.style.display = 'flex';
+                popupAvatarFallback.textContent = initial;
+            }
+
+            // ── Popup info ──
+            document.getElementById('popupName').textContent = displayName;
+            document.getElementById('popupEmail').textContent = email;
+
+            // ── Welcome page (si ya renderizada) ──
+            var welcomeName = document.getElementById('welcomeUserName');
+            if (welcomeName) welcomeName.textContent = firstName;
+
+            console.log('👤 Perfil cargado: ' + displayName + ' (' + email + ')');
+        }
+
+        // ── Auth State Observer ──
+        auth.onAuthStateChanged(function(user) {
+            if (user) {
+                console.log('✅ [Dashboard] Autenticado: ' + user.uid);
+                populateUserProfile(user);
+            } else {
+                console.log('🔒 [Dashboard] Sin sesión → login.html');
+                window.location.href = 'login.html';
+            }
+        });
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // PROFILE POPUP — position:fixed + JS getBoundingClientRect()
+        // El popup vive FUERA del sidebar para evitar que overflow lo recorte
+        // ═════════════════════════════════════════════════════════════════════════
+
+        function openProfilePopup() {
+            var avatarEl = document.getElementById('sidebarProfile');
+            var popup = document.getElementById('profilePopup');
+            var overlay = document.getElementById('profileOverlay');
+
+            // Calcular posición basada en el avatar
+            var rect = avatarEl.getBoundingClientRect();
+            popup.style.left = (rect.right + 8) + 'px';   // 8px a la derecha del sidebar
+            popup.style.top = rect.top + 'px';              // alineado al top del avatar
+
+            popup.classList.add('open');
+            overlay.classList.add('open');
+            console.log('📋 Popup abierto en left:' + popup.style.left + ' top:' + popup.style.top);
+        }
+
+        function closeProfilePopup() {
+            document.getElementById('profilePopup').classList.remove('open');
+            document.getElementById('profileOverlay').classList.remove('open');
+        }
+
+        // Click en avatar → toggle popup
+        document.getElementById('sidebarProfile').addEventListener('click', function(e) {
+            e.stopPropagation();
+            var popup = document.getElementById('profilePopup');
+            if (popup.classList.contains('open')) {
+                closeProfilePopup();
+            } else {
+                openProfilePopup();
+            }
+        });
+
+        // Click en overlay → cerrar
+        document.getElementById('profileOverlay').addEventListener('click', function() {
+            closeProfilePopup();
+        });
+
+        // Escape → cerrar
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeProfilePopup();
+        });
+
+        // ── Logout ──
+        document.getElementById('btnLogout').addEventListener('click', function(e) {
+            e.stopPropagation();
+            closeProfilePopup();
+            auth.signOut().then(function() {
+                console.log('👋 Sesión cerrada');
+                window.location.href = 'login.html';
+            }).catch(function(err) {
+                console.error('Error logout:', err);
+            });
+        });
+
+        // ── Re-poblar nombre al cambiar de pestaña a Welcome ──
+        var _origUpdateContent = updateContent;
+        updateContent = function() {
+            _origUpdateContent();
+            var currentUser = auth.currentUser;
+            if (currentUser) {
+                var welcomeName = document.getElementById('welcomeUserName');
+                if (welcomeName) {
+                    welcomeName.textContent = (currentUser.displayName || currentUser.email || 'Trader').split(' ')[0];
+                }
+            }
+        };
     </script>
+    <!--==================================-->
 </body>
 </html>

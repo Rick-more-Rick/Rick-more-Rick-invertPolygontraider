@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+cerr<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -785,15 +785,18 @@
     </div>
     <!-- ═══════════════════════════════════════════════════════════════════════════ -->
     <script>
-        // ═════════════════════════════════════════════════════════════════════════
-        // MÓDULO GUIDEBOOK v2.1 - CÓDIGO COMPLETO
-        // ═════════════════════════════════════════════════════════════════════════
-        // ✅ FIX: assignToReel ahora actualiza correctamente el reel principal
-        // ✅ FIX: updateReelIfMatches trackea ticker del reel principal
-        // ✅ FIX: Detección de horario de mercado + modo After Hours
-        // ✅ FIX: WebSocket robusto con fallback a REST API
-        // ✅ NEW v2.1: Mini-chat flotante transparente en reels pequeños
-        // ═════════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
+        // MÓDULO GUIDEBOOK v3.0 - FULL REAL-TIME (Polygon Pro)
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ✅ KEPT: assignToReel, updateReelIfMatches, Mini-chat flotante v2.1
+        // ✅ KEPT: Detección de horario de mercado, WebSocket robusto
+        // ✅ KEPT: Navbar dropdown system, Reel selector, Chat system
+        // ─────────────────────────────────────────────────────────────────────────────
+        // 🔄 FIX v3.0: generatePriceHistory() → fetchRealPriceHistory() via Aggs API
+        // 🔄 FIX v3.0: fetchLastPrice() → fetchSnapshotPrice() via Snapshot API
+        // 🔄 FIX v3.0: startPriceSimulation() → startRESTPolling() (polling real)
+        // 🔄 FIX v3.0: fetchAllLastPrices() → fetchAllSnapshots() (bulk snapshot)
+        // ═════════════════════════════════════════════════════════════════════════════
 
         // ─────────────────────────────────────────────────────────────────────────
         // POLYGON API CONFIG
@@ -806,6 +809,15 @@
         var MAX_RECONNECT = 5;
         var lastMessageTime = Date.now();
         var tradeCount = { stocks: 0, crypto: 0, forex: 0 };
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // ✅ v3.0: CONFIG DE POLLING REST (fallback cuando WS está caído)
+        // ─────────────────────────────────────────────────────────────────────────
+        var REST_POLLING_CONFIG = {
+            interval: 5000,        // Poll cada 5 segundos cuando WS no disponible
+            intervalId: null,
+            isPolling: false
+        };
 
         // ─────────────────────────────────────────────────────────────────────────
         // ESTADO DE MERCADO (horarios)
@@ -836,7 +848,7 @@
         };
 
         // ─────────────────────────────────────────────────────────────────────────
-        // ✅ v2.1: CONFIG MINI-CHAT FLOTANTE
+        // ✅ v2.1: CONFIG MINI-CHAT FLOTANTE (sin cambios)
         // ─────────────────────────────────────────────────────────────────────────
         var MINI_CHAT_CONFIG = {
             maxMessages: 3,
@@ -846,7 +858,7 @@
         };
 
         // ─────────────────────────────────────────────────────────────────────────
-        // CATÁLOGO DE ACTIVOS POR MERCADO
+        // CATÁLOGO DE ACTIVOS POR MERCADO (sin cambios)
         // ─────────────────────────────────────────────────────────────────────────
         var MARKET_ASSETS = {
             dow: {
@@ -931,7 +943,7 @@
             }
         };
 
-        // Estado del navbar
+        // Estado del navbar (sin cambios)
         var navbarState = {
             activeDropdown: null,
             pendingAsset: null,
@@ -939,28 +951,27 @@
         };
 
         // ─────────────────────────────────────────────────────────────────────────
-        // CONFIGURACIÓN DE REELS
+        // CONFIGURACIÓN DE REELS (sin cambios)
         // ─────────────────────────────────────────────────────────────────────────
         var REELS_CONFIG = [
-            { id: 'reel-1', symbol: 'AAPL', name: 'Apple Inc.', color: '#3b82f6', price: 178.52, change: 2.34, isPositive: true },
-            { id: 'reel-2', symbol: 'NVDA', name: 'NVIDIA Corporation', color: '#22c55e', price: 875.30, change: 5.67, isPositive: true },
-            { id: 'reel-3', symbol: 'TSLA', name: 'Tesla Inc.', color: '#ef4444', price: 245.80, change: -1.23, isPositive: false },
-            { id: 'reel-4', symbol: 'MSFT', name: 'Microsoft Corp.', color: '#f59e0b', price: 415.20, change: 1.89, isPositive: true }
+            { id: 'reel-1', symbol: 'AAPL', name: 'Apple Inc.', color: '#3b82f6', price: 0, change: 0, isPositive: true },
+            { id: 'reel-2', symbol: 'NVDA', name: 'NVIDIA Corporation', color: '#22c55e', price: 0, change: 0, isPositive: true },
+            { id: 'reel-3', symbol: 'TSLA', name: 'Tesla Inc.', color: '#ef4444', price: 0, change: 0, isPositive: false },
+            { id: 'reel-4', symbol: 'MSFT', name: 'Microsoft Corp.', color: '#f59e0b', price: 0, change: 0, isPositive: true }
         ];
 
         var guidebookState = {
             activeReelId: 'reel-4',
             smallReels: ['reel-1', 'reel-2', 'reel-3'],
             isConnected: true,
-            simulationInterval: null,
-            afterHoursSimInterval: null,
             priceHistory: {},
             chatMessages: {},
             useRealData: false
+            // ✅ v3.0: Eliminados simulationInterval y afterHoursSimInterval
         };
 
         // ─────────────────────────────────────────────────────────────────────────
-        // UTILIDADES
+        // UTILIDADES (sin cambios)
         // ─────────────────────────────────────────────────────────────────────────
         function findReelById(id) {
             for (var i = 0; i < REELS_CONFIG.length; i++) {
@@ -983,9 +994,8 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // DETECCIÓN DE HORARIO DE MERCADO
+        // DETECCIÓN DE HORARIO DE MERCADO (sin cambios)
         // ═════════════════════════════════════════════════════════════════════════
-
         function checkMarketHours() {
             var now = new Date();
             var utcHour = now.getUTCHours();
@@ -1027,6 +1037,9 @@
             if (oldStockStatus !== marketStatus.stocks) {
                 console.log('[Market] Estado de bolsa cambió: ' + oldStockStatus + ' → ' + marketStatus.stocks);
                 updateMarketStatusUI();
+
+                // ✅ v3.0: Re-evaluar polling cuando cambia el estado del mercado
+                evaluatePollingNeed();
             }
 
             return marketStatus;
@@ -1070,7 +1083,373 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // NAVBAR DROPDOWN SYSTEM
+        // 🔄 v3.0: SNAPSHOT API — Precio actual REAL (reemplaza fetchLastPrice)
+        // ═════════════════════════════════════════════════════════════════════════
+
+        /**
+         * Construye la URL de Snapshot según el tipo de mercado.
+         * Polygon Pro: datos en tiempo real sin delay.
+         */
+        function getSnapshotURL(ticker, type) {
+            if (type === 'stocks') {
+                return 'https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/' + ticker + '?apiKey=' + API_KEY;
+            } else if (type === 'crypto') {
+                return 'https://api.polygon.io/v2/snapshot/locale/global/markets/crypto/tickers/' + ticker + '?apiKey=' + API_KEY;
+            } else if (type === 'forex') {
+                return 'https://api.polygon.io/v2/snapshot/locale/global/markets/forex/tickers/' + ticker + '?apiKey=' + API_KEY;
+            }
+            return null;
+        }
+
+        /**
+         * 🔄 v3.0: REEMPLAZA fetchLastPrice()
+         * Obtiene precio ACTUAL via Snapshot API (no cierre de ayer).
+         */
+        function fetchSnapshotPrice(ticker, type, reelId) {
+            var url = getSnapshotURL(ticker, type);
+            if (!url) return;
+
+            console.log('[SNAPSHOT] Obteniendo precio real de ' + ticker + '...');
+
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    var snapshot = data.ticker || data;
+                    if (!snapshot) {
+                        console.warn('[SNAPSHOT] Sin datos para ' + ticker);
+                        return;
+                    }
+
+                    var price = 0;
+                    var change = 0;
+                    var todaysChange = 0;
+
+                    if (type === 'stocks') {
+                        // Snapshot de stocks: snapshot.lastTrade.p o snapshot.min.c
+                        if (snapshot.lastTrade && snapshot.lastTrade.p) {
+                            price = snapshot.lastTrade.p;
+                        } else if (snapshot.min && snapshot.min.c) {
+                            price = snapshot.min.c;
+                        } else if (snapshot.prevDay && snapshot.prevDay.c) {
+                            price = snapshot.prevDay.c;
+                        }
+
+                        if (snapshot.todaysChangePerc !== undefined) {
+                            change = snapshot.todaysChangePerc;
+                        } else if (snapshot.prevDay && snapshot.prevDay.c && price > 0) {
+                            change = ((price - snapshot.prevDay.c) / snapshot.prevDay.c) * 100;
+                        }
+                    } else if (type === 'crypto') {
+                        // Snapshot de crypto
+                        if (snapshot.lastTrade && snapshot.lastTrade.p) {
+                            price = snapshot.lastTrade.p;
+                        } else if (snapshot.min && snapshot.min.c) {
+                            price = snapshot.min.c;
+                        }
+
+                        if (snapshot.todaysChangePerc !== undefined) {
+                            change = snapshot.todaysChangePerc;
+                        } else if (snapshot.prevDay && snapshot.prevDay.c && price > 0) {
+                            change = ((price - snapshot.prevDay.c) / snapshot.prevDay.c) * 100;
+                        }
+                    } else if (type === 'forex') {
+                        // Snapshot de forex
+                        if (snapshot.lastQuote && snapshot.lastQuote.a) {
+                            price = snapshot.lastQuote.a; // ask price
+                        } else if (snapshot.min && snapshot.min.c) {
+                            price = snapshot.min.c;
+                        }
+
+                        if (snapshot.todaysChangePerc !== undefined) {
+                            change = snapshot.todaysChangePerc;
+                        } else if (snapshot.prevDay && snapshot.prevDay.c && price > 0) {
+                            change = ((price - snapshot.prevDay.c) / snapshot.prevDay.c) * 100;
+                        }
+                    }
+
+                    if (price <= 0) {
+                        console.warn('[SNAPSHOT] Precio inválido para ' + ticker + ':', price);
+                        return;
+                    }
+
+                    console.log('[SNAPSHOT] ✅ ' + ticker + ': $' + price.toFixed(2) + ' (' + change.toFixed(2) + '%)');
+
+                    // Actualizar catálogo
+                    updateAssetPrice(ticker, price, type);
+                    updateAssetChange(ticker, change, type);
+
+                    // Actualizar reel
+                    var reel = findReelById(reelId);
+                    if (reel) {
+                        reel.price = price;
+                        reel.change = change;
+                        reel.isPositive = change >= 0;
+
+                        // Agregar al historial real
+                        var history = guidebookState.priceHistory[reelId];
+                        if (history && history.length > 0) {
+                            history.push({ time: Date.now(), price: price });
+                            if (history.length > 200) history.shift();
+                        }
+
+                        updateReelData(reelId, reel);
+                        if (reelId === guidebookState.activeReelId) {
+                            updateMainReelData(reel);
+                            drawMainChart();
+                        }
+                        drawAllCharts();
+                    }
+                })
+                .catch(function(err) {
+                    console.warn('[SNAPSHOT] Error para ' + ticker + ':', err);
+                });
+        }
+
+        /**
+         * 🔄 v3.0: REEMPLAZA fetchAllLastPrices()
+         * Obtiene snapshots reales para todos los reels.
+         */
+        function fetchAllSnapshots() {
+            var reelIds = Object.keys(reelTickerMap);
+            for (var i = 0; i < reelIds.length; i++) {
+                var reelId = reelIds[i];
+                var ticker = reelTickerMap[reelId];
+                var type = reelMarketType[reelId];
+                fetchSnapshotPrice(ticker, type, reelId);
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // 🔄 v3.0: HISTORIAL REAL DE PRECIOS (reemplaza generatePriceHistory)
+        // ═════════════════════════════════════════════════════════════════════════
+        /**
+         * 🔄 v3.0: Obtiene historial REAL de precios minutales desde Polygon Aggs API.
+         * Usa barras de 1 minuto de las últimas ~2 horas para el gráfico.
+         */
+        function fetchRealPriceHistory(ticker, type, reelId) {
+            var now = new Date();
+            var from = new Date(now.getTime() - 2 * 60 * 60 * 1000); // 2 horas atrás
+
+            var fromStr = from.toISOString().split('T')[0];
+            var toStr = now.toISOString().split('T')[0];
+
+            // Si from y to son el mismo día, necesitamos incluir timestamps
+            // Polygon acepta YYYY-MM-DD o timestamps en milisegundos
+            var fromTs = from.getTime();
+            var toTs = now.getTime();
+
+            var url = 'https://api.polygon.io/v2/aggs/ticker/' + ticker +
+                    '/range/1/minute/' + fromTs + '/' + toTs +
+                    '?adjusted=true&sort=asc&limit=120&apiKey=' + API_KEY;
+
+            console.log('[HISTORY] Cargando historial real de ' + ticker + '...');
+
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.results && data.results.length > 0) {
+                        var history = [];
+                        for (var i = 0; i < data.results.length; i++) {
+                            var bar = data.results[i];
+                            history.push({
+                                time: bar.t,       // timestamp del bar
+                                price: bar.c,      // close price del minuto
+                                open: bar.o,
+                                high: bar.h,
+                                low: bar.l,
+                                volume: bar.v
+                            });
+                        }
+
+                        guidebookState.priceHistory[reelId] = history;
+
+                        // Actualizar precio del reel con el último bar
+                        var lastBar = data.results[data.results.length - 1];
+                        var firstBar = data.results[0];
+                        var reel = findReelById(reelId);
+                        if (reel) {
+                            reel.price = lastBar.c;
+                            reel.change = ((lastBar.c - firstBar.o) / firstBar.o) * 100;
+                            reel.isPositive = reel.change >= 0;
+
+                            updateReelData(reelId, reel);
+                            if (reelId === guidebookState.activeReelId) {
+                                updateMainReelData(reel);
+                            }
+                        }
+
+                        drawAllCharts();
+                        console.log('[HISTORY] ✅ ' + ticker + ': ' + history.length + ' barras reales cargadas');
+                    } else {
+                        console.warn('[HISTORY] Sin barras para ' + ticker + ' (mercado puede estar cerrado). Intentando con día anterior...');
+                        fetchPrevDayHistory(ticker, type, reelId);
+                    }
+                })
+                .catch(function(err) {
+                    console.warn('[HISTORY] Error para ' + ticker + ':', err);
+                    fetchPrevDayHistory(ticker, type, reelId);
+                });
+        }
+        /**
+         * 🔄 v3.0: Fallback — obtiene historial del último día de trading.
+         * Se usa cuando el mercado está cerrado y no hay barras intraday.
+         */
+        function fetchPrevDayHistory(ticker, type, reelId) {
+            var now = new Date();
+            // Buscar en los últimos 5 días para cubrir fines de semana
+            var from = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+
+            var fromStr = from.toISOString().split('T')[0];
+            var toStr = now.toISOString().split('T')[0];
+
+            var url = 'https://api.polygon.io/v2/aggs/ticker/' + ticker +
+                    '/range/5/minute/' + fromStr + '/' + toStr +
+                    '?adjusted=true&sort=asc&limit=200&apiKey=' + API_KEY;
+
+            console.log('[HISTORY-FALLBACK] Cargando historial extendido de ' + ticker + '...');
+
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.results && data.results.length > 0) {
+                        var history = [];
+                        // Tomar las últimas 100 barras como máximo
+                        var startIdx = Math.max(0, data.results.length - 100);
+                        for (var i = startIdx; i < data.results.length; i++) {
+                            var bar = data.results[i];
+                            history.push({
+                                time: bar.t,
+                                price: bar.c,
+                                open: bar.o,
+                                high: bar.h,
+                                low: bar.l,
+                                volume: bar.v
+                            });
+                        }
+
+                        guidebookState.priceHistory[reelId] = history;
+
+                        var lastBar = data.results[data.results.length - 1];
+                        var firstBar = data.results[startIdx];
+                        var reel = findReelById(reelId);
+                        if (reel) {
+                            reel.price = lastBar.c;
+                            reel.change = ((lastBar.c - firstBar.o) / firstBar.o) * 100;
+                            reel.isPositive = reel.change >= 0;
+
+                            updateReelData(reelId, reel);
+                            if (reelId === guidebookState.activeReelId) {
+                                updateMainReelData(reel);
+                            }
+                        }
+
+                        drawAllCharts();
+                        console.log('[HISTORY-FALLBACK] ✅ ' + ticker + ': ' + history.length + ' barras reales cargadas');
+                    } else {
+                        console.warn('[HISTORY-FALLBACK] Sin datos históricos para ' + ticker);
+                    }
+                })
+                .catch(function(err) {
+                    console.warn('[HISTORY-FALLBACK] Error para ' + ticker + ':', err);
+                });
+        }
+
+        /**
+         * 🔄 v3.0: Carga historial real para TODOS los reels al iniciar.
+         */
+        function fetchAllRealHistories() {
+            var reelIds = Object.keys(reelTickerMap);
+            for (var i = 0; i < reelIds.length; i++) {
+                var reelId = reelIds[i];
+                var ticker = reelTickerMap[reelId];
+                var type = reelMarketType[reelId];
+
+                // Delay escalonado para no saturar la API (250ms entre cada request)
+                (function(t, tp, r) {
+                    setTimeout(function() {
+                        fetchRealPriceHistory(t, tp, r);
+                    }, i * 250);
+                })(ticker, type, reelId);
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // 🔄 v3.0: REST POLLING (reemplaza startPriceSimulation)
+        // ═════════════════════════════════════════════════════════════════════════
+
+        /**
+         * 🔄 v3.0: REEMPLAZA startPriceSimulation()
+         * En lugar de generar precios falsos con Math.random(), consulta la
+         * Snapshot API de Polygon cada 5 segundos para reels cuyo WebSocket
+         * no esté conectado.
+         */
+        function startRESTPolling() {
+            if (REST_POLLING_CONFIG.intervalId) {
+                clearInterval(REST_POLLING_CONFIG.intervalId);
+            }
+
+            REST_POLLING_CONFIG.intervalId = setInterval(function() {
+                var needsPolling = false;
+
+                for (var i = 0; i < REELS_CONFIG.length; i++) {
+                    var reel = REELS_CONFIG[i];
+                    var reelId = reel.id;
+                    var type = reelMarketType[reelId] || 'stocks';
+                    var ticker = reelTickerMap[reelId];
+
+                    // Solo hacer polling si:
+                    // 1. El mercado está activo PERO el WebSocket no está conectado
+                    // 2. O estamos en after-hours/pre-market y queremos datos reales
+                    var wsConnected = navbarState.wsStatus[type] === 'connected';
+                    var marketActive = isMarketActive(type);
+
+                    if (marketActive && !wsConnected) {
+                        needsPolling = true;
+                        fetchSnapshotPrice(ticker, type, reelId);
+                    }
+                }
+
+                REST_POLLING_CONFIG.isPolling = needsPolling;
+
+                if (!needsPolling) {
+                    console.log('[POLLING] Todos los WS activos o mercados cerrados. Polling pausado.');
+                }
+            }, REST_POLLING_CONFIG.interval);
+
+            console.log('[POLLING] ✅ REST Polling iniciado (cada ' + (REST_POLLING_CONFIG.interval / 1000) + 's como fallback)');
+        }
+
+        /**
+         * 🔄 v3.0: Evalúa si se necesita polling REST.
+         * Se llama cuando cambia el estado del mercado o del WebSocket.
+         */
+        function evaluatePollingNeed() {
+            var anyNeedsPolling = false;
+            var reelIds = Object.keys(reelTickerMap);
+
+            for (var i = 0; i < reelIds.length; i++) {
+                var type = reelMarketType[reelIds[i]];
+                var wsConnected = navbarState.wsStatus[type] === 'connected';
+                var marketActive = isMarketActive(type);
+
+                if (marketActive && !wsConnected) {
+                    anyNeedsPolling = true;
+                    break;
+                }
+            }
+
+            if (anyNeedsPolling && !REST_POLLING_CONFIG.intervalId) {
+                startRESTPolling();
+            } else if (!anyNeedsPolling && REST_POLLING_CONFIG.intervalId) {
+                console.log('[POLLING] Ya no se necesita polling. Detenido.');
+                clearInterval(REST_POLLING_CONFIG.intervalId);
+                REST_POLLING_CONFIG.intervalId = null;
+                REST_POLLING_CONFIG.isPolling = false;
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // NAVBAR DROPDOWN SYSTEM (sin cambios)
         // ═════════════════════════════════════════════════════════════════════════
 
         function toggleMarketDropdown(marketKey) {
@@ -1145,7 +1524,7 @@
         });
 
         // ═════════════════════════════════════════════════════════════════════════
-        // REEL SELECTOR
+        // REEL SELECTOR (sin cambios)
         // ═════════════════════════════════════════════════════════════════════════
 
         function onAssetClick(marketKey, assetIndex) {
@@ -1203,7 +1582,7 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // assignToReel — CORREGIDO v2.0
+        // assignToReel — 🔄 v3.0: usa fetchRealPriceHistory en lugar de generatePriceHistory
         // ═════════════════════════════════════════════════════════════════════════
 
         function assignToReel(reelId) {
@@ -1229,8 +1608,10 @@
             reelTickerMap[reelId] = pending.ticker;
             reelMarketType[reelId] = pending.type;
 
-            var basePrice = reel.price > 0 ? reel.price : 100;
-            guidebookState.priceHistory[reelId] = generatePriceHistory(basePrice, 50);
+            // 🔄 v3.0: Cargar historial REAL en lugar de generarlo con Math.random()
+            guidebookState.priceHistory[reelId] = []; // Limpiar mientras carga
+            fetchRealPriceHistory(pending.ticker, pending.type, reelId);
+
             guidebookState.chatMessages[reelId] = generateInitialChatMessages(pending.displayTicker);
 
             var reelEl = document.querySelector('[data-reel-id="' + reelId + '"]');
@@ -1254,14 +1635,16 @@
             drawAllCharts();
             subscribeToTicker(pending.type, pending.ticker);
 
-            if (!isMarketActive(pending.type)) {
-                fetchLastPrice(pending.ticker, pending.type, reelId);
-            }
+            // 🔄 v3.0: Obtener precio actual via Snapshot (siempre, no solo cuando mercado cerrado)
+            fetchSnapshotPrice(pending.ticker, pending.type, reelId);
 
             // ✅ v2.1: Refrescar mini-chats al asignar nuevo activo
             if (guidebookState.smallReels.indexOf(reelId) !== -1) {
                 renderMiniChat(reelId);
             }
+
+            // 🔄 v3.0: Re-evaluar si necesitamos polling
+            evaluatePollingNeed();
 
             closeReelSelector();
             closeDropdown();
@@ -1269,72 +1652,7 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // Fetch último precio via REST
-        // ═════════════════════════════════════════════════════════════════════════
-
-        function fetchLastPrice(ticker, type, reelId) {
-            var url = '';
-
-            if (type === 'stocks') {
-                url = 'https://api.polygon.io/v2/aggs/ticker/' + ticker + '/prev?adjusted=true&apiKey=' + API_KEY;
-            } else if (type === 'crypto') {
-                url = 'https://api.polygon.io/v2/aggs/ticker/' + ticker + '/prev?adjusted=true&apiKey=' + API_KEY;
-            } else if (type === 'forex') {
-                url = 'https://api.polygon.io/v2/aggs/ticker/' + ticker + '/prev?adjusted=true&apiKey=' + API_KEY;
-            }
-
-            if (!url) return;
-
-            console.log('[REST] Fetching last price for ' + ticker + '...');
-
-            fetch(url)
-                .then(function(response) { return response.json(); })
-                .then(function(data) {
-                    if (data.results && data.results.length > 0) {
-                        var result = data.results[0];
-                        var price = result.c;
-                        var open = result.o;
-                        var change = open > 0 ? ((price - open) / open) * 100 : 0;
-
-                        console.log('[REST] ' + ticker + ' último precio: $' + price.toFixed(2) + ' (' + change.toFixed(2) + '%)');
-
-                        updateAssetPrice(ticker, price, type);
-                        updateAssetChange(ticker, change, type);
-
-                        var reel = findReelById(reelId);
-                        if (reel) {
-                            reel.price = price;
-                            reel.change = change;
-                            reel.isPositive = change >= 0;
-
-                            guidebookState.priceHistory[reelId] = generatePriceHistory(price, 50);
-
-                            updateReelData(reelId, reel);
-                            if (reelId === guidebookState.activeReelId) {
-                                updateMainReelData(reel);
-                                drawMainChart();
-                            }
-                            drawAllCharts();
-                        }
-                    }
-                })
-                .catch(function(err) {
-                    console.warn('[REST] Error fetching price for ' + ticker + ':', err);
-                });
-        }
-
-        function fetchAllLastPrices() {
-            var reelIds = Object.keys(reelTickerMap);
-            for (var i = 0; i < reelIds.length; i++) {
-                var reelId = reelIds[i];
-                var ticker = reelTickerMap[reelId];
-                var type = reelMarketType[reelId];
-                fetchLastPrice(ticker, type, reelId);
-            }
-        }
-
-        // ═════════════════════════════════════════════════════════════════════════
-        // POLYGON WEBSOCKET REAL-TIME
+        // POLYGON WEBSOCKET REAL-TIME (sin cambios en lógica core)
         // ═════════════════════════════════════════════════════════════════════════
 
         function ensureWebSocketConnection(type) {
@@ -1365,6 +1683,7 @@
             } catch (e) {
                 console.error('[WS] Error creando WebSocket:', e);
                 navbarState.wsStatus[type] = 'disconnected';
+                evaluatePollingNeed(); // 🔄 v3.0
                 return;
             }
 
@@ -1394,10 +1713,12 @@
                             updateDropdownWsStatus(type);
                             subscribeAllTickers(type);
                             guidebookState.useRealData = true;
+                            evaluatePollingNeed(); // 🔄 v3.0: Detener polling si WS conectó
                         } else if (msg.status === 'auth_failed') {
                             console.error('[WS] ❌ Auth falló: ' + type);
                             navbarState.wsStatus[type] = 'disconnected';
                             updateDropdownWsStatus(type);
+                            evaluatePollingNeed(); // 🔄 v3.0
                         }
                         continue;
                     }
@@ -1431,8 +1752,10 @@
                     console.log('[WS] Reconectando ' + type + ' en ' + delay + 'ms (intento ' + reconnectAttempts[type] + '/' + MAX_RECONNECT + ')');
                     setTimeout(function() { connectWebSocket(type); }, delay);
                 } else {
-                    console.warn('[WS] Máximo de reconexiones alcanzado para ' + type + '. Usando simulación.');
+                    console.warn('[WS] Máximo de reconexiones alcanzado para ' + type + '. Activando REST polling.');
                 }
+
+                evaluatePollingNeed(); // 🔄 v3.0: Activar polling si WS se cayó
             };
 
             ws.onerror = function(error) {
@@ -1498,7 +1821,7 @@
             console.log('[WS] Suscrito a ticker:', ticker);
         }
 
-        // ── Trade Handlers ──
+        // ── Trade Handlers (sin cambios) ──
 
         function handleStockTrade(msg) {
             updateAssetPrice(msg.sym, msg.p, 'stocks');
@@ -1525,7 +1848,7 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // ACTUALIZACIÓN DE PRECIOS — Catálogo + Dropdown
+        // ACTUALIZACIÓN DE PRECIOS — Catálogo + Dropdown (sin cambios)
         // ═════════════════════════════════════════════════════════════════════════
 
         function formatPrice(price) {
@@ -1589,7 +1912,7 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // updateReelIfMatches — usa reelTickerMap (FIX v2.0)
+        // updateReelIfMatches — usa reelTickerMap (sin cambios)
         // ═════════════════════════════════════════════════════════════════════════
 
         function updateReelIfMatches(ticker, price) {
@@ -1610,7 +1933,7 @@
                     reel.change = ((price - history[0].price) / history[0].price) * 100;
                     reel.isPositive = reel.change >= 0;
                     history.push({ time: Date.now(), price: price });
-                    if (history.length > 100) history.shift();
+                    if (history.length > 200) history.shift(); // 🔄 v3.0: 200 en vez de 100
                 }
 
                 updateReelData(reelId, reel);
@@ -1637,13 +1960,16 @@
                 label = '🟢 EN VIVO';
                 cssClass = 'connected';
             } else if (status === 'connected' && mktStatus === 'after-hours') {
-                label = '🟠 AFTER HOURS';
+                label = '🟠 AFTER HOURS — EN VIVO';  // 🔄 v3.0: clarifica que es real-time
                 cssClass = 'connected';
             } else if (status === 'connected' && mktStatus === 'closed') {
                 label = '🔴 CERRADO (último cierre)';
                 cssClass = 'connected';
             } else if (status === 'connecting') {
                 label = '🟡 CONECTANDO...';
+                cssClass = 'connecting';
+            } else if (REST_POLLING_CONFIG.isPolling) {
+                label = '🟡 REST POLLING';  // 🔄 v3.0: indica que está usando REST
                 cssClass = 'connecting';
             } else {
                 label = '⚪ DESCONECTADO';
@@ -1655,7 +1981,7 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // FUNCIONES DE ACTUALIZACIÓN DE UI (Reels)
+        // FUNCIONES DE ACTUALIZACIÓN DE UI — Reels (sin cambios)
         // ═════════════════════════════════════════════════════════════════════════
 
         function updateReelData(reelId, reel) {
@@ -1756,17 +2082,8 @@
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // GENERADORES DE DATOS
+        // GENERADORES DE DATOS — Chat (sin cambios, es feature social)
         // ─────────────────────────────────────────────────────────────────────────
-        function generatePriceHistory(basePrice, points) {
-            var history = [];
-            var currentPrice = basePrice * 0.98;
-            for (var i = 0; i < points; i++) {
-                currentPrice = currentPrice * (1 + (Math.random() - 0.48) * 0.01);
-                history.push({ time: Date.now() - (points - i) * 60000, price: currentPrice });
-            }
-            return history;
-        }
 
         function generateInitialChatMessages(symbol) {
             return [
@@ -1778,50 +2095,8 @@
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // SIMULACIONES — Con lógica de After Hours
+        // SIMULACIÓN DE CHAT (sin cambios — es feature social, no datos de mercado)
         // ─────────────────────────────────────────────────────────────────────────
-
-        function startPriceSimulation() {
-            if (guidebookState.simulationInterval) clearInterval(guidebookState.simulationInterval);
-
-            guidebookState.simulationInterval = setInterval(function() {
-                for (var i = 0; i < REELS_CONFIG.length; i++) {
-                    var reel = REELS_CONFIG[i];
-                    var reelId = reel.id;
-                    var type = reelMarketType[reelId] || 'stocks';
-
-                    var history = guidebookState.priceHistory[reelId];
-                    if (!history || history.length === 0) continue;
-
-                    if (isMarketActive(type) && navbarState.wsStatus[type] === 'connected') {
-                        continue;
-                    }
-
-                    var volatility = 0.006;
-                    if (marketStatus[type] === 'after-hours') {
-                        volatility = 0.002;
-                    } else if (marketStatus[type] === 'closed') {
-                        volatility = 0.0005;
-                    }
-
-                    var lastPrice = history[history.length - 1].price;
-                    var newPrice = lastPrice * (1 + (Math.random() - 0.48) * volatility);
-
-                    history.push({ time: Date.now(), price: newPrice });
-                    if (history.length > 100) history.shift();
-
-                    reel.price = newPrice;
-                    reel.change = ((newPrice - history[0].price) / history[0].price) * 100;
-                    reel.isPositive = reel.change >= 0;
-
-                    updateReelData(reelId, reel);
-                    if (reelId === guidebookState.activeReelId) {
-                        updateMainReelData(reel);
-                    }
-                }
-                drawAllCharts();
-            }, 1000);
-        }
 
         function startChatSimulation() {
             var users = [
@@ -1853,7 +2128,7 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // addChatMessage — MODIFICADA v2.1 para incluir mini-chat flotante
+        // addChatMessage — v2.1 con mini-chat flotante (sin cambios)
         // ═════════════════════════════════════════════════════════════════════════
 
         function addChatMessage(reelId, message) {
@@ -1861,7 +2136,6 @@
             guidebookState.chatMessages[reelId].push(message);
             if (guidebookState.chatMessages[reelId].length > 50) guidebookState.chatMessages[reelId].shift();
 
-            // ── Chat principal (reel activo) ──
             if (reelId === guidebookState.activeReelId) {
                 var messagesEl = document.querySelector('[data-chat-messages]');
                 if (messagesEl) {
@@ -1879,290 +2153,127 @@
                 }
             }
 
-            // ── ✅ v2.1: Mini-chat flotante (reels pequeños) ──
             if (guidebookState.smallReels.indexOf(reelId) !== -1) {
                 addMiniChatMessage(reelId, message);
             }
         }
 
         // ═════════════════════════════════════════════════════════════════════════
-        // ✅ v2.1: MINI-CHAT FLOTANTE — Sistema completo
+        // ✅ v2.1: MINI-CHAT FLOTANTE — Sistema completo (sin cambios)
         // ═════════════════════════════════════════════════════════════════════════
 
-        /**
-         * Inyecta los estilos CSS del mini-chat una sola vez en <head>
-         */
         function injectMiniChatStyles() {
             if (document.getElementById('mini-chat-styles')) return;
 
             var style = document.createElement('style');
             style.id = 'mini-chat-styles';
             style.textContent = ''
-                // Contenedor flotante sobre el reel pequeño
                 + '.mini-chat-float {'
-                + '  position: absolute;'
-                + '  left: 0;'
-                + '  right: 0;'
-                + '  bottom: 0;'
-                + '  z-index: 10;'
-                + '  padding: 6px 8px;'
-                + '  pointer-events: none;'
-                + '  display: flex;'
-                + '  flex-direction: column;'
-                + '  justify-content: flex-end;'
-                + '  gap: 3px;'
-                + '  max-height: 50%;'
-                + '  overflow: hidden;'
+                + '  position: absolute; left: 0; right: 0; bottom: 0; z-index: 10;'
+                + '  padding: 6px 8px; pointer-events: none; display: flex;'
+                + '  flex-direction: column; justify-content: flex-end; gap: 3px;'
+                + '  max-height: 50%; overflow: hidden;'
                 + '  background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 60%, transparent 100%);'
                 + '  border-radius: 0 0 10px 10px;'
                 + '}'
-
-                // Cada mensaje
-                + '.mcf-msg {'
-                + '  display: flex;'
-                + '  align-items: flex-start;'
-                + '  gap: 5px;'
-                + '  opacity: 0;'
-                + '  transform: translateY(8px);'
-                + '  animation: mcfIn 0.35s ease-out forwards;'
-                + '  transition: opacity 0.8s ease-out, transform 0.8s ease-out;'
-                + '}'
-
-                + '.mcf-msg.mcf-fading {'
-                + '  opacity: 0 !important;'
-                + '  transform: translateY(-4px);'
-                + '}'
-
-                + '@keyframes mcfIn {'
-                + '  from { opacity: 0; transform: translateY(8px); }'
-                + '  to   { opacity: 1; transform: translateY(0); }'
-                + '}'
-
-                // Avatar mini
-                + '.mcf-avatar {'
-                + '  font-size: 11px;'
-                + '  line-height: 1;'
-                + '  flex-shrink: 0;'
-                + '  width: 16px;'
-                + '  height: 16px;'
-                + '  display: flex;'
-                + '  align-items: center;'
-                + '  justify-content: center;'
-                + '  border-radius: 50%;'
-                + '  background: rgba(255,255,255,0.1);'
-                + '}'
-
-                // Contenido del mensaje
-                + '.mcf-content {'
-                + '  flex: 1;'
-                + '  min-width: 0;'
-                + '}'
-
-                + '.mcf-user {'
-                + '  font-size: 9px;'
-                + '  font-weight: 600;'
-                + '  color: rgba(245, 158, 11, 0.9);'
-                + '  margin-right: 4px;'
-                + '  white-space: nowrap;'
-                + '}'
-
-                + '.mcf-text {'
-                + '  font-size: 10px;'
-                + '  color: rgba(255,255,255,0.85);'
-                + '  line-height: 1.3;'
-                + '  display: -webkit-box;'
-                + '  -webkit-line-clamp: 1;'
-                + '  -webkit-box-orient: vertical;'
-                + '  overflow: hidden;'
-                + '  text-overflow: ellipsis;'
-                + '  white-space: nowrap;'
-                + '}'
-
-                // Typing indicator
-                + '.mcf-typing {'
-                + '  display: flex;'
-                + '  align-items: center;'
-                + '  gap: 3px;'
-                + '  padding: 2px 0;'
-                + '  opacity: 0;'
-                + '  transition: opacity 0.3s;'
-                + '}'
-
-                + '.mcf-typing.mcf-typing-visible {'
-                + '  opacity: 0.6;'
-                + '}'
-
-                + '.mcf-typing-dot {'
-                + '  width: 3px;'
-                + '  height: 3px;'
-                + '  border-radius: 50%;'
-                + '  background: rgba(255,255,255,0.6);'
-                + '  animation: mcfBounce 1.2s infinite;'
-                + '}'
-                + '.mcf-typing-dot:nth-child(2) { animation-delay: 0.15s; }'
-                + '.mcf-typing-dot:nth-child(3) { animation-delay: 0.3s; }'
-
-                + '@keyframes mcfBounce {'
-                + '  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }'
-                + '  30% { transform: translateY(-3px); opacity: 1; }'
-                + '}'
-
-                // Asegurar position relative en reels pequeños
-                + '.reel-small {'
-                + '  position: relative;'
-                + '  overflow: hidden;'
-                + '}';
+                + '.mcf-msg { display: flex; align-items: flex-start; gap: 5px; opacity: 0;'
+                + '  transform: translateY(8px); animation: mcfIn 0.35s ease-out forwards;'
+                + '  transition: opacity 0.8s ease-out, transform 0.8s ease-out; }'
+                + '.mcf-msg.mcf-fading { opacity: 0 !important; transform: translateY(-4px); }'
+                + '@keyframes mcfIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }'
+                + '.mcf-avatar { font-size:11px; line-height:1; flex-shrink:0; width:16px; height:16px;'
+                + '  display:flex; align-items:center; justify-content:center; border-radius:50%;'
+                + '  background:rgba(255,255,255,0.1); }'
+                + '.mcf-content { flex:1; min-width:0; }'
+                + '.mcf-user { font-size:9px; font-weight:600; color:rgba(245,158,11,0.9); margin-right:4px; white-space:nowrap; }'
+                + '.mcf-text { font-size:10px; color:rgba(255,255,255,0.85); line-height:1.3;'
+                + '  display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical;'
+                + '  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }'
+                + '.mcf-typing { display:flex; align-items:center; gap:3px; padding:2px 0; opacity:0; transition:opacity 0.3s; }'
+                + '.mcf-typing.mcf-typing-visible { opacity:0.6; }'
+                + '.mcf-typing-dot { width:3px; height:3px; border-radius:50%; background:rgba(255,255,255,0.6); animation:mcfBounce 1.2s infinite; }'
+                + '.mcf-typing-dot:nth-child(2) { animation-delay:0.15s; }'
+                + '.mcf-typing-dot:nth-child(3) { animation-delay:0.3s; }'
+                + '@keyframes mcfBounce { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-3px);opacity:1} }'
+                + '.reel-small { position:relative; overflow:hidden; }';
 
             document.head.appendChild(style);
             console.log('[MiniChat] ✅ Estilos inyectados');
         }
 
-        /**
-         * Inyecta el contenedor .mini-chat-float dentro de cada reel pequeño
-         */
         function injectMiniChatContainers() {
             var smallReels = document.querySelectorAll('.reel-small[data-reel-id]');
-
             for (var i = 0; i < smallReels.length; i++) {
                 var reelEl = smallReels[i];
                 var reelId = reelEl.getAttribute('data-reel-id');
-
-                // No duplicar
                 if (reelEl.querySelector('.mini-chat-float')) continue;
-
                 var container = document.createElement('div');
                 container.className = 'mini-chat-float';
                 container.setAttribute('data-mini-chat', reelId);
-
-                // Typing indicator
-                container.innerHTML = ''
-                    + '<div class="mcf-typing" data-mcf-typing="' + reelId + '">'
-                    +   '<span class="mcf-typing-dot"></span>'
-                    +   '<span class="mcf-typing-dot"></span>'
-                    +   '<span class="mcf-typing-dot"></span>'
-                    + '</div>';
-
+                container.innerHTML = '<div class="mcf-typing" data-mcf-typing="' + reelId + '">'
+                    + '<span class="mcf-typing-dot"></span><span class="mcf-typing-dot"></span><span class="mcf-typing-dot"></span></div>';
                 reelEl.appendChild(container);
             }
         }
 
-        /**
-         * Renderiza los últimos N mensajes en un mini-chat
-         */
         function renderMiniChat(reelId) {
             var container = document.querySelector('[data-mini-chat="' + reelId + '"]');
             if (!container) return;
-
             var messages = guidebookState.chatMessages[reelId] || [];
             var lastMessages = messages.slice(-MINI_CHAT_CONFIG.maxMessages);
-
-            // Limpiar mensajes previos (mantener typing)
             var existing = container.querySelectorAll('.mcf-msg');
-            for (var i = 0; i < existing.length; i++) {
-                existing[i].remove();
-            }
-
+            for (var i = 0; i < existing.length; i++) { existing[i].remove(); }
             var typingEl = container.querySelector('[data-mcf-typing]');
-
             for (var j = 0; j < lastMessages.length; j++) {
                 var msg = lastMessages[j];
                 var msgEl = document.createElement('div');
                 msgEl.className = 'mcf-msg';
-
-                var avatarHtml = MINI_CHAT_CONFIG.showAvatars
-                    ? '<span class="mcf-avatar">' + (msg.avatar || '💬') + '</span>'
-                    : '';
-
-                msgEl.innerHTML = avatarHtml
-                    + '<span class="mcf-content">'
-                    +   '<span class="mcf-user">' + (msg.user || 'User') + '</span>'
-                    +   '<span class="mcf-text">' + (msg.text || '') + '</span>'
-                    + '</span>';
-
-                if (typingEl) {
-                    container.insertBefore(msgEl, typingEl);
-                } else {
-                    container.appendChild(msgEl);
-                }
+                var avatarHtml = MINI_CHAT_CONFIG.showAvatars ? '<span class="mcf-avatar">' + (msg.avatar || '💬') + '</span>' : '';
+                msgEl.innerHTML = avatarHtml + '<span class="mcf-content"><span class="mcf-user">' + (msg.user || 'User') + '</span>'
+                    + '<span class="mcf-text">' + (msg.text || '') + '</span></span>';
+                if (typingEl) { container.insertBefore(msgEl, typingEl); } else { container.appendChild(msgEl); }
             }
         }
 
-        /**
-         * Agrega UN mensaje nuevo con animación + auto-fade
-         */
         function addMiniChatMessage(reelId, message) {
             var container = document.querySelector('[data-mini-chat="' + reelId + '"]');
             if (!container) return;
-
-            // Si hay demasiados, fade-out del más viejo
             var existingMsgs = container.querySelectorAll('.mcf-msg');
             if (existingMsgs.length >= MINI_CHAT_CONFIG.maxMessages) {
                 var oldest = existingMsgs[0];
                 oldest.classList.add('mcf-fading');
-                setTimeout(function() {
-                    if (oldest.parentNode) oldest.remove();
-                }, 800);
+                setTimeout(function() { if (oldest.parentNode) oldest.remove(); }, 800);
             }
-
-            // Crear nuevo mensaje
             var msgEl = document.createElement('div');
             msgEl.className = 'mcf-msg';
-
-            var avatarHtml = MINI_CHAT_CONFIG.showAvatars
-                ? '<span class="mcf-avatar">' + (message.avatar || '💬') + '</span>'
-                : '';
-
-            msgEl.innerHTML = avatarHtml
-                + '<span class="mcf-content">'
-                +   '<span class="mcf-user">' + (message.user || 'User') + '</span>'
-                +   '<span class="mcf-text">' + (message.text || '') + '</span>'
-                + '</span>';
-
+            var avatarHtml = MINI_CHAT_CONFIG.showAvatars ? '<span class="mcf-avatar">' + (message.avatar || '💬') + '</span>' : '';
+            msgEl.innerHTML = avatarHtml + '<span class="mcf-content"><span class="mcf-user">' + (message.user || 'User') + '</span>'
+                + '<span class="mcf-text">' + (message.text || '') + '</span></span>';
             var typingEl = container.querySelector('[data-mcf-typing]');
-            if (typingEl) {
-                container.insertBefore(msgEl, typingEl);
-            } else {
-                container.appendChild(msgEl);
-            }
-
-            // Flash typing indicator
+            if (typingEl) { container.insertBefore(msgEl, typingEl); } else { container.appendChild(msgEl); }
             showMiniTyping(reelId, 800);
-
-            // Auto-desvanecer después de la duración
             setTimeout(function() {
                 if (msgEl.parentNode) {
                     msgEl.classList.add('mcf-fading');
-                    setTimeout(function() {
-                        if (msgEl.parentNode) msgEl.remove();
-                    }, MINI_CHAT_CONFIG.fadeOutDuration);
+                    setTimeout(function() { if (msgEl.parentNode) msgEl.remove(); }, MINI_CHAT_CONFIG.fadeOutDuration);
                 }
             }, MINI_CHAT_CONFIG.messageDuration);
         }
 
-        /**
-         * Muestra typing indicator brevemente
-         */
         function showMiniTyping(reelId, duration) {
             var el = document.querySelector('[data-mcf-typing="' + reelId + '"]');
             if (!el) return;
             el.classList.add('mcf-typing-visible');
-            setTimeout(function() {
-                el.classList.remove('mcf-typing-visible');
-            }, duration || 1500);
+            setTimeout(function() { el.classList.remove('mcf-typing-visible'); }, duration || 1500);
         }
 
-        /**
-         * Refrescar todos los mini-chats
-         */
         function refreshAllMiniChats() {
             var smallReels = guidebookState.smallReels || [];
-            for (var i = 0; i < smallReels.length; i++) {
-                renderMiniChat(smallReels[i]);
-            }
+            for (var i = 0; i < smallReels.length; i++) { renderMiniChat(smallReels[i]); }
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // GRÁFICAS
+        // GRÁFICAS (sin cambios)
         // ─────────────────────────────────────────────────────────────────────────
         function drawAllCharts() {
             for (var i = 0; i < guidebookState.smallReels.length; i++) {
@@ -2247,15 +2358,14 @@
                 ctx.fillText(formatPrice(maxPrice - (priceRange / 6) * g), canvas.width - padding.right + 10, gy + 4);
             }
 
-            // Indicador de mercado en el chart
             var activeType = reelMarketType[guidebookState.activeReelId] || 'stocks';
             var mktLabel = '';
             if (marketStatus[activeType] === 'after-hours') {
-                mktLabel = '🟠 AFTER HOURS';
+                mktLabel = '🟠 AFTER HOURS — EN VIVO';  // 🔄 v3.0
             } else if (marketStatus[activeType] === 'closed') {
-                mktLabel = '🔴 CERRADO';
+                mktLabel = '🔴 CERRADO (último cierre real)';  // 🔄 v3.0
             } else if (marketStatus[activeType] === 'pre-market') {
-                mktLabel = '🟡 PRE-MARKET';
+                mktLabel = '🟡 PRE-MARKET — EN VIVO';  // 🔄 v3.0
             }
 
             if (mktLabel) {
@@ -2298,39 +2408,23 @@
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // INTERACCIONES
+        // INTERACCIONES (sin cambios)
         // ─────────────────────────────────────────────────────────────────────────
         function setupReelInteractions() {
             var smallReels = document.querySelectorAll('.reel-small');
             for (var i = 0; i < smallReels.length; i++) {
                 (function(reelEl) {
                     var reelId = reelEl.getAttribute('data-reel-id');
-
                     reelEl.addEventListener('click', function(e) {
-                        // ✅ v2.1: No hacer swap si el click fue en el mini-chat
                         if (e.target.closest('.mini-chat-float')) return;
-                        if (!reelEl.classList.contains('dragging')) {
-                            swapReelsWithClick(reelId);
-                        }
+                        if (!reelEl.classList.contains('dragging')) { swapReelsWithClick(reelId); }
                     });
-
-                    reelEl.addEventListener('dragstart', function(e) {
-                        e.dataTransfer.setData('text/plain', reelId);
-                        reelEl.classList.add('dragging');
-                    });
-                    reelEl.addEventListener('dragend', function() {
-                        reelEl.classList.remove('dragging');
-                    });
-                    reelEl.addEventListener('dragover', function(e) {
-                        e.preventDefault();
-                        reelEl.classList.add('drag-over');
-                    });
-                    reelEl.addEventListener('dragleave', function() {
-                        reelEl.classList.remove('drag-over');
-                    });
+                    reelEl.addEventListener('dragstart', function(e) { e.dataTransfer.setData('text/plain', reelId); reelEl.classList.add('dragging'); });
+                    reelEl.addEventListener('dragend', function() { reelEl.classList.remove('dragging'); });
+                    reelEl.addEventListener('dragover', function(e) { e.preventDefault(); reelEl.classList.add('drag-over'); });
+                    reelEl.addEventListener('dragleave', function() { reelEl.classList.remove('drag-over'); });
                     reelEl.addEventListener('drop', function(e) {
-                        e.preventDefault();
-                        reelEl.classList.remove('drag-over');
+                        e.preventDefault(); reelEl.classList.remove('drag-over');
                         var draggedId = e.dataTransfer.getData('text/plain');
                         if (draggedId !== reelId) swapSmallReels(draggedId, reelId);
                     });
@@ -2341,17 +2435,8 @@
         function setupChatInteractions() {
             var input = document.querySelector('[data-chat-input]');
             var sendBtn = document.querySelector('[data-chat-send]');
-
-            if (input) {
-                input.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') sendUserChatMessage();
-                });
-            }
-            if (sendBtn) {
-                sendBtn.addEventListener('click', function() {
-                    sendUserChatMessage();
-                });
-            }
+            if (input) { input.addEventListener('keypress', function(e) { if (e.key === 'Enter') sendUserChatMessage(); }); }
+            if (sendBtn) { sendBtn.addEventListener('click', function() { sendUserChatMessage(); }); }
         }
 
         function setupMenuInteractions() {
@@ -2359,9 +2444,7 @@
             for (var i = 0; i < intervalBtns.length; i++) {
                 (function(btn) {
                     btn.addEventListener('click', function() {
-                        for (var j = 0; j < intervalBtns.length; j++) {
-                            intervalBtns[j].classList.remove('active');
-                        }
+                        for (var j = 0; j < intervalBtns.length; j++) { intervalBtns[j].classList.remove('active'); }
                         btn.classList.add('active');
                     });
                 })(intervalBtns[i]);
@@ -2371,12 +2454,7 @@
         function sendUserChatMessage() {
             var input = document.querySelector('[data-chat-input]');
             if (!input || !input.value.trim()) return;
-            addChatMessage(guidebookState.activeReelId, {
-                user: 'Tu',
-                avatar: '😎',
-                text: input.value.trim(),
-                color: '#3b82f6'
-            });
+            addChatMessage(guidebookState.activeReelId, { user: 'Tu', avatar: '😎', text: input.value.trim(), color: '#3b82f6' });
             input.value = '';
         }
 
@@ -2384,7 +2462,6 @@
             var currentMainReelId = guidebookState.activeReelId;
             var clickedIndex = guidebookState.smallReels.indexOf(clickedReelId);
             if (clickedIndex === -1) return;
-
             guidebookState.smallReels[clickedIndex] = currentMainReelId;
             switchToReel(clickedReelId);
         }
@@ -2396,26 +2473,18 @@
                 var temp = guidebookState.smallReels[index1];
                 guidebookState.smallReels[index1] = guidebookState.smallReels[index2];
                 guidebookState.smallReels[index2] = temp;
-
-                for (var i = 0; i < REELS_CONFIG.length; i++) {
-                    updateReelData(REELS_CONFIG[i].id, REELS_CONFIG[i]);
-                }
-
-                // ✅ v2.1: Refrescar mini-chats al hacer swap
-                setTimeout(function() {
-                    injectMiniChatContainers();
-                    refreshAllMiniChats();
-                }, 50);
+                for (var i = 0; i < REELS_CONFIG.length; i++) { updateReelData(REELS_CONFIG[i].id, REELS_CONFIG[i]); }
+                setTimeout(function() { injectMiniChatContainers(); refreshAllMiniChats(); }, 50);
             }
         }
 
-        // ─────────────────────────────────────────────────────────────────────────
-        // INICIALIZACIÓN
-        // ─────────────────────────────────────────────────────────────────────────
+        // ═════════════════════════════════════════════════════════════════════════
+        // 🔄 v3.0: INICIALIZACIÓN — FULL REAL-TIME
+        // ═════════════════════════════════════════════════════════════════════════
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('═══════════════════════════════════════════════');
-            console.log('📊 Guidebook Module v2.1 — Iniciando...');
-            console.log('═══════════════════════════════════════════════');
+            console.log('═══════════════════════════════════════════════════════');
+            console.log('📊 Guidebook Module v3.0 — FULL REAL-TIME (Polygon Pro)');
+            console.log('═══════════════════════════════════════════════════════');
 
             // 1. Detectar horario de mercado
             checkMarketHours();
@@ -2423,14 +2492,14 @@
             console.log('[Market] Crypto:', marketStatus.crypto);
             console.log('[Market] Forex:', marketStatus.forex);
 
-            // 2. Generar datos iniciales para cada reel
+            // 2. Inicializar historiales vacíos y chat por reel
             for (var i = 0; i < REELS_CONFIG.length; i++) {
                 var reel = REELS_CONFIG[i];
-                guidebookState.priceHistory[reel.id] = generatePriceHistory(reel.price, 50);
+                guidebookState.priceHistory[reel.id] = [];  // 🔄 v3.0: vacío, se llenará con datos reales
                 guidebookState.chatMessages[reel.id] = generateInitialChatMessages(reel.symbol);
             }
 
-            // 3. ✅ v2.1: Inyectar estilos y contenedores del mini-chat
+            // 3. ✅ v2.1: Inyectar estilos del mini-chat
             injectMiniChatStyles();
 
             // 4. Inicializar UI
@@ -2439,50 +2508,66 @@
                 setupReelInteractions();
                 setupChatInteractions();
                 setupMenuInteractions();
-                startPriceSimulation();
-                startChatSimulation();
-                drawAllCharts();
+                startChatSimulation();  // Chat social (no datos de mercado)
                 updateMarketStatusUI();
 
-                // 5. ✅ v2.1: Inyectar y renderizar mini-chats
+                // 5. ✅ v2.1: Mini-chats
                 injectMiniChatContainers();
                 refreshAllMiniChats();
 
-                // 6. Cargar precios reales via REST
-                fetchAllLastPrices();
+                // ═════════════════════════════════════════════════════════════════
+                // 🔄 v3.0: CARGA DE DATOS REALES (reemplaza generatePriceHistory)
+                // ═════════════════════════════════════════════════════════════════
 
-                // 7. Conectar WebSockets para mercados activos
+                // 6. Cargar historial REAL de precios (barras minutales de Polygon)
+                fetchAllRealHistories();
+
+                // 7. Obtener precios actuales via Snapshot API (reemplaza fetchAllLastPrices)
+                setTimeout(function() {
+                    fetchAllSnapshots();
+                }, 1500); // Esperar a que los historiales se carguen primero
+
+                // 8. Conectar WebSockets para datos en vivo
                 if (isMarketActive('stocks')) {
                     connectWebSocket('stocks');
                 } else {
-                    console.log('[WS] Bolsa cerrada — usando último cierre + simulación mínima');
+                    console.log('[WS] Bolsa cerrada — mostrando último cierre real (sin simulación)');
                 }
 
-                connectWebSocket('crypto');
+                connectWebSocket('crypto'); // Crypto siempre abierto
 
                 if (isMarketActive('forex')) {
                     connectWebSocket('forex');
                 }
 
-                // 8. Revisar horario periódicamente
+                // 9. 🔄 v3.0: REST Polling como fallback (reemplaza startPriceSimulation)
+                evaluatePollingNeed();
+
+                // 10. Redibujar charts periódicamente (para incorporar nuevos datos WS)
+                setInterval(function() {
+                    drawAllCharts();
+                }, 2000);
+
+                // 11. Revisar horario periódicamente
                 setInterval(function() {
                     checkMarketHours();
                 }, marketStatus.checkInterval);
 
-                console.log('═══════════════════════════════════════════════');
-                console.log('📊 Guidebook v2.1 — Listo ✅');
-                console.log('  • Reel principal fix: ACTIVO');
-                console.log('  • reelTickerMap tracking: ACTIVO');
-                console.log('  • Market hours detection: ACTIVO');
-                console.log('  • After-hours mode: ACTIVO');
-                console.log('  • REST fallback prices: ACTIVO');
-                console.log('  • 💬 Mini-chat flotante: ACTIVO');
-                console.log('═══════════════════════════════════════════════');
+                console.log('═══════════════════════════════════════════════════════');
+                console.log('📊 Guidebook v3.0 — FULL REAL-TIME ✅');
+                console.log('  ✅ Historial de precios: DATOS REALES (Polygon Aggs)');
+                console.log('  ✅ Precio actual: SNAPSHOT API (no /prev)');
+                console.log('  ✅ Tiempo real: WEBSOCKET (Polygon Pro)');
+                console.log('  ✅ Fallback: REST POLLING cada 5s (no Math.random)');
+                console.log('  ✅ After-hours: DATOS REALES via WS + Snapshot');
+                console.log('  ✅ Pre-market: DATOS REALES via WS + Snapshot');
+                console.log('  ❌ ELIMINADO: generatePriceHistory (Math.random)');
+                console.log('  ❌ ELIMINADO: startPriceSimulation (Math.random)');
+                console.log('  ❌ ELIMINADO: fetchLastPrice (/prev endpoint)');
+                console.log('  💬 Mini-chat flotante: ACTIVO (feature social)');
+                console.log('═══════════════════════════════════════════════════════');
             }, 100);
         });
-        /*==========================================*/
-        
-        
     </script>
     <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 </body>

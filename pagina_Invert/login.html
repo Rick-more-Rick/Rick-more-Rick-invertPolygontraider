@@ -612,13 +612,14 @@
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <script>
         // ═════════════════════════════════════════════════════════════════════════════
-        // DONTRADING — AUTH MODULE v2.2
+        // DONTRADING — AUTH MODULE v2.3
         // ✅ Google: popup con fallback a redirect
         // ✅ Email: registro + verificación obligatoria antes de entrar
         // ✅ Phone: OTP con reCAPTCHA invisible
         // ✅ Debug: banner visual + logs detallados
         // ✅ Redirect: getRedirectResult() al cargar página
-        // ✅ NEW: Widget de verificación de email post-registro
+        // ✅ Widget de verificación de email post-registro
+        // ✅ FIX: Email de verificación redirige a verified.html (no login.html)
         // ═════════════════════════════════════════════════════════════════════════════
 
         // ─── FIREBASE CONFIG ─────────────────────────────────────────────────────────
@@ -644,7 +645,8 @@
         var recaptchaVerifierRegister  = null;
         var pendingRegPhoneData        = {};
         var isRedirecting              = false;
-        var isWaitingEmailVerification = false;  // ← NUEVO: bloquea auto-redirect mientras espera verificación
+        var isWaitingEmailVerification = false;
+        var isExplicitLogin            = false;  // ← NUEVO: solo redirigir tras acción explícita del usuario
 
         // ─── Google Provider — configuración completa ────────────────────────────────
         var googleProvider = new firebase.auth.GoogleAuthProvider();
@@ -690,6 +692,7 @@
                 if (result && result.user) {
                     debugLog('✅ Redirect result captured! UID: ' + result.user.uid);
                     isRedirecting = true;
+                    isExplicitLogin = true;  // ← El usuario volvió de Google, es acción explícita
                     await saveUserToFirestore(result.user, { provider: 'google' });
                     showAlert('success', '¡Bienvenido! Redirigiendo...');
                     redirectToDashboard(1200);
@@ -717,7 +720,6 @@
             });
             document.getElementById('viewSwitcher').style.display = viewName === 'recovery' ? 'none' : 'flex';
 
-            // ── Ocultar widget de verificación si cambia de vista ──
             hideEmailVerificationWidget();
             hideAlert();
         }
@@ -777,7 +779,7 @@
                         provider:  extraData.provider || 'unknown',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         plan:      'free',
-                        verified:  false  // ← CAMBIO: empieza como false hasta verificar email
+                        verified:  false
                     });
                     debugLog('✅ Nuevo usuario en Firestore (verified: false)');
                 } else {
@@ -881,13 +883,9 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // ██  WIDGET DE VERIFICACIÓN DE EMAIL — NUEVO
+        // ██  WIDGET DE VERIFICACIÓN DE EMAIL
         // ═════════════════════════════════════════════════════════════════════════════
 
-        /**
-         * Inyecta el widget HTML si no existe aún en el DOM.
-         * Se llama una sola vez; las siguientes llamadas solo muestran/ocultan.
-         */
         function ensureVerificationWidgetExists() {
             if (document.getElementById('emailVerificationWidget')) return;
 
@@ -911,7 +909,6 @@
                 +   '<a href="#" class="evw-link" onclick="cancelVerificationAndLogout(); return false;">← Volver al inicio de sesión</a>'
                 + '</div>';
 
-            // ── Estilos del widget ──
             var style = document.createElement('style');
             style.textContent = ''
                 + '#emailVerificationWidget { display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; }'
@@ -946,9 +943,6 @@
             document.body.appendChild(widget);
         }
 
-        /**
-         * Muestra el widget de verificación con el email del usuario.
-         */
         function showEmailVerificationWidget(email) {
             ensureVerificationWidgetExists();
             document.getElementById('evwEmail').textContent = email;
@@ -965,10 +959,6 @@
             isWaitingEmailVerification = false;
         }
 
-        /**
-         * Botón "Ya verifiqué mi correo"
-         * Recarga el estado del usuario desde Firebase y verifica emailVerified.
-         */
         async function checkEmailVerified() {
             var btn = document.getElementById('btnCheckVerified');
             var status = document.getElementById('evwStatus');
@@ -993,10 +983,7 @@
 
                 console.log('📧 [VERIFICATION] UID: ' + user.uid + ' | emailVerified antes de reload: ' + user.emailVerified);
 
-                // ── Recargar datos del usuario desde Firebase Auth ──
                 await user.reload();
-
-                // ── Re-obtener el usuario (reload() actualiza el objeto en memoria) ──
                 user = auth.currentUser;
 
                 console.log('📧 [VERIFICATION] emailVerified después de reload: ' + user.emailVerified);
@@ -1006,7 +993,6 @@
                     status.textContent = '¡Correo verificado! Redirigiendo al dashboard...';
                     status.className = 'evw-status success';
 
-                    // ── Actualizar Firestore: verified = true ──
                     try {
                         await db.collection('users').doc(user.uid).update({ verified: true });
                         console.log('✅ [VERIFICATION] Firestore actualizado: verified = true');
@@ -1014,7 +1000,6 @@
                         console.warn('⚠️ [VERIFICATION] No se pudo actualizar Firestore (no bloquea):', fsErr);
                     }
 
-                    // ── Redirigir al dashboard ──
                     isWaitingEmailVerification = false;
                     redirectToDashboard(1500);
 
@@ -1035,9 +1020,9 @@
             }
         }
 
-        /**
-         * Botón "Reenviar correo de verificación"
-         */
+        // ═══════════════════════════════════════════════════════════════════════════
+        // ✅ FIX v2.3: Todas las URLs de sendEmailVerification apuntan a verified.html
+        // ═══════════════════════════════════════════════════════════════════════════
         async function resendVerificationEmail() {
             var btn = document.getElementById('btnResendVerification');
             var status = document.getElementById('evwStatus');
@@ -1063,7 +1048,7 @@
                 console.log('📧 [RESEND] Enviando a: ' + user.email);
 
                 await user.sendEmailVerification({
-                    url: window.location.origin + '/login.html',
+                    url: window.location.origin + '/verified.html',   // ← FIX: era /login.html
                     handleCodeInApp: false
                 });
 
@@ -1071,7 +1056,6 @@
                 status.textContent = '¡Correo reenviado! Revisa tu bandeja de entrada y spam.';
                 status.className = 'evw-status success';
 
-                // Cooldown de 30 segundos para evitar spam
                 var countdown = 30;
                 btn.textContent = 'Reenviar en ' + countdown + 's';
                 var interval = setInterval(function() {
@@ -1099,9 +1083,6 @@
             }
         }
 
-        /**
-         * "Volver al inicio de sesión" — cierra sesión y oculta widget
-         */
         async function cancelVerificationAndLogout() {
             console.log('📧 [VERIFICATION] Usuario canceló. Cerrando sesión...');
             isWaitingEmailVerification = false;
@@ -1120,6 +1101,7 @@
         // ═════════════════════════════════════════════════════════════════════════════
         async function handleGoogleSignIn() {
             hideAlert();
+            isExplicitLogin = true;
             var btn = document.getElementById('btnGoogleLogin');
             if (btn) { btn.disabled = true; btn.textContent = 'Conectando...'; }
 
@@ -1177,6 +1159,7 @@
         // ═════════════════════════════════════════════════════════════════════════════
         async function handleLoginEmail() {
             hideAlert();
+            isExplicitLogin = true;
             var email = document.getElementById('loginEmail').value.trim();
             var password = document.getElementById('loginEmailPassword').value;
 
@@ -1192,10 +1175,9 @@
                 var user = result.user;
                 debugLog('✅ Login email OK. UID: ' + user.uid + ' | emailVerified: ' + user.emailVerified);
 
-                // ── NUEVO: Verificar si el email está confirmado ──
                 if (!user.emailVerified) {
                     console.warn('⚠️ [LOGIN] Email no verificado. Mostrando widget...');
-                    isRedirecting = true; // Bloquea onAuthStateChanged
+                    isRedirecting = true;
                     await saveUserToFirestore(user, { provider: 'email' });
                     showEmailVerificationWidget(user.email);
                     setButtonLoading('btnLoginEmail', false);
@@ -1224,6 +1206,7 @@
         // ═════════════════════════════════════════════════════════════════════════════
         async function handleLoginPhone() {
             hideAlert();
+            isExplicitLogin = true;
             var phone = document.getElementById('loginPhone').value.trim();
             var password = document.getElementById('loginPhonePassword').value;
 
@@ -1316,6 +1299,7 @@
         // ═════════════════════════════════════════════════════════════════════════════
         async function handleRegisterEmail() {
             hideAlert();
+            isExplicitLogin = true;
             var name     = document.getElementById('regEmailName').value.trim();
             var email    = document.getElementById('regEmail').value.trim();
             var password = document.getElementById('regEmailPassword').value;
@@ -1330,11 +1314,6 @@
             setButtonLoading('btnRegisterEmail', true);
             debugLog('Register email: ' + email);
 
-            // ═══════════════════════════════════════════════════════════════════
-            // ✅ CRITICAL FIX: Bloquear auto-redirect ANTES de crear usuario
-            // Sin esto, onAuthStateChanged redirige al dashboard instantáneamente
-            // y sendEmailVerification nunca se ejecuta.
-            // ═══════════════════════════════════════════════════════════════════
             isRedirecting = true;
 
             try {
@@ -1357,7 +1336,7 @@
                 try {
                     console.log('📧 [REGISTER] Enviando email de verificación a: ' + email + '...');
                     await user.sendEmailVerification({
-                        url: window.location.origin + '/login.html',
+                        url: window.location.origin + '/verified.html',   // ← FIX: era /login.html
                         handleCodeInApp: false
                     });
                     emailSent = true;
@@ -1381,11 +1360,10 @@
                     console.log('📧 [REGISTER] Mostrando widget de verificación...');
                     showEmailVerificationWidget(email);
                 } else {
-                    // Si no se pudo enviar, intenta una vez más
                     console.warn('⚠️ [REGISTER] Reintentando envío de email...');
                     try {
                         await user.sendEmailVerification({
-                            url: window.location.origin + '/login.html',
+                            url: window.location.origin + '/verified.html',   // ← FIX: era /login.html
                             handleCodeInApp: false
                         });
                         console.log('✅ [REGISTER] Email enviado en segundo intento');
@@ -1393,12 +1371,11 @@
                     } catch (retryErr) {
                         console.error('❌ [REGISTER] Segundo intento también falló:', retryErr);
                         showAlert('error', 'No pudimos enviar el correo de verificación. Intenta iniciar sesión y reenviar.');
-                        isRedirecting = false; // Desbloquear
+                        isRedirecting = false;
                     }
                 }
 
             } catch (err) {
-                // ── Si falla la creación de cuenta, desbloquear auto-redirect ──
                 isRedirecting = false;
                 debugError('Register email error', err);
 
@@ -1418,6 +1395,7 @@
         // ═════════════════════════════════════════════════════════════════════════════
         async function handleRegisterPhone() {
             hideAlert();
+            isExplicitLogin = true;
             var name     = document.getElementById('regPhoneName').value.trim();
             var phone    = document.getElementById('regPhone').value.trim();
             var password = document.getElementById('regPhonePassword').value;
@@ -1547,17 +1525,23 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // AUTH STATE OBSERVER — ACTUALIZADO
+        // AUTH STATE OBSERVER — Ya NO auto-redirige al cargar la página
+        // Solo redirige si el usuario hizo una acción explícita (login/registro)
         // ═════════════════════════════════════════════════════════════════════════════
         auth.onAuthStateChanged(function(user) {
             if (user && !isRedirecting && !isWaitingEmailVerification) {
                 debugLog('👤 Auth state: ' + user.uid + ' (' + (user.email || user.phoneNumber || 'google') + ') | emailVerified: ' + user.emailVerified);
 
+                // ── Si NO fue acción explícita del usuario, NO redirigir ──
+                if (!isExplicitLogin) {
+                    debugLog('ℹ️ Sesión existente detectada. Esperando acción del usuario para redirigir.');
+                    return;
+                }
+
                 var isVerifying = document.getElementById('registerPhoneVerify').classList.contains('active')
                             || document.getElementById('loginPhoneVerify').classList.contains('active');
 
                 if (!isVerifying) {
-                    // ── NUEVO: Si es proveedor email y no ha verificado, mostrar widget ──
                     var isEmailProvider = user.providerData.some(function(p) { return p.providerId === 'password'; });
                     var isGoogleProvider = user.providerData.some(function(p) { return p.providerId === 'google.com'; });
 
@@ -1568,7 +1552,7 @@
                         return;
                     }
 
-                    debugLog('🚀 Auto-redirect: ya autenticado y verificado');
+                    debugLog('🚀 Redirigiendo a dashboard tras login explícito');
                     window.location.href = 'dashboard.html';
                 }
             }
@@ -1577,7 +1561,7 @@
         // ═════════════════════════════════════════════════════════════════════════════
         // INIT
         // ═════════════════════════════════════════════════════════════════════════════
-        console.log('🔐 DONTRADING Login v2.2 — Email Verification Required');
+        console.log('🔐 DONTRADING Login v2.4 — No auto-redirect + explicit login flow');
         console.log('📧 Email/Password: ✅  |  📱 Phone/SMS: ✅  |  🔵 Google: ✅');
         console.log('🌐 Domain: ' + window.location.hostname);
         console.log('🔗 Origin: ' + window.location.origin);
