@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DONTRADING — Completar Perfil</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ══════════════════════════════════════════════════════════════════════ */
+        /*     DONTRADING — COMPLETAR PERFIL  v1.0 (Onboarding Step)           */
+        /*     Dark Mode · DonTrading Brand · Avatar + Username                */
+        /*     Estructura: colección "usuarios" → listo para Chat Firebase     */
+        /* ══════════════════════════════════════════════════════════════════════ */
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-card: #111827;
+            --bg-input: #0d1220;
+            --bg-hover: #151d2e;
+            --accent: #f59e0b;
+            --accent-soft: #d97706;
+            --accent-glow: rgba(245, 158, 11, 0.15);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: #1e293b;
+            --border-light: #334155;
+            --positive: #22c55e;
+            --negative: #ef4444;
+            --info: #3b82f6;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* ── BACKGROUND ───────────────────────────────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background:
+                radial-gradient(ellipse 600px 400px at 20% 30%, rgba(245, 158, 11, 0.04) 0%, transparent 70%),
+                radial-gradient(ellipse 500px 500px at 80% 70%, rgba(59, 130, 246, 0.03) 0%, transparent 70%),
+                radial-gradient(ellipse 400px 300px at 50% 50%, rgba(245, 158, 11, 0.02) 0%, transparent 70%);
+            animation: bgDrift 20s ease-in-out infinite alternate;
+            pointer-events: none; z-index: 0;
+        }
+        @keyframes bgDrift {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(30px, -20px) rotate(2deg); }
+        }
+        body::after {
+            content: '';
+            position: fixed; inset: 0;
+            background-image:
+                linear-gradient(rgba(245, 158, 11, 0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(245, 158, 11, 0.015) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none; z-index: 0;
+        }
+
+        /* ── CONTAINER ────────────────────────────────────────────────────── */
+        .profile-wrapper {
+            position: relative; z-index: 1;
+            width: 100%; max-width: 520px; padding: 20px;
+        }
+
+        /* ── LOGO ─────────────────────────────────────────────────────────── */
+        .logo-section { text-align: center; margin-bottom: 28px; }
+        .logo-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 56px; height: 56px; border-radius: 16px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+            font-weight: 800; font-size: 20px; color: var(--bg-primary);
+            margin-bottom: 14px;
+            box-shadow: 0 8px 32px rgba(245, 158, 11, 0.2);
+        }
+        .logo-title { font-size: 22px; font-weight: 300; letter-spacing: -0.5px; }
+        .logo-title .brand { font-weight: 800; }
+        .logo-title .pro { font-style: italic; font-weight: 300; color: var(--accent); }
+
+        /* ── CARD ──────────────────────────────────────────────────────────── */
+        .profile-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 36px 32px;
+            position: relative;
+            overflow: hidden;
+            animation: cardIn 0.5s ease-out;
+        }
+        .profile-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.4;
+        }
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── STEP INDICATOR ───────────────────────────────────────────────── */
+        .step-header { text-align: center; margin-bottom: 28px; }
+        .step-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 6px 14px;
+            background: var(--accent-glow);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 20px;
+            font-size: 11px; font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 14px;
+        }
+        .step-title { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+        .step-subtitle { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+        /* ── AVATAR PREVIEW ───────────────────────────────────────────────── */
+        .avatar-preview-section { display: flex; justify-content: center; margin-bottom: 24px; }
+        .avatar-preview {
+            width: 96px; height: 96px;
+            border-radius: 50%;
+            border: 3px solid var(--border);
+            background: var(--bg-input);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 42px;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        .avatar-preview.selected {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-glow), 0 8px 24px rgba(245, 158, 11, 0.15);
+        }
+        .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* ── AVATAR GRID ──────────────────────────────────────────────────── */
+        .section-label {
+            display: block; font-size: 12px; font-weight: 500;
+            color: var(--text-secondary); margin-bottom: 10px;
+            letter-spacing: 0.3px; text-transform: uppercase;
+        }
+        .avatar-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+        .avatar-option {
+            aspect-ratio: 1;
+            border-radius: 14px;
+            border: 2px solid var(--border);
+            background: var(--bg-input);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .avatar-option:hover {
+            border-color: var(--border-light);
+            background: var(--bg-hover);
+            transform: translateY(-2px);
+        }
+        .avatar-option.active {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+        }
+        .avatar-option.active::after {
+            content: '✓';
+            position: absolute;
+            top: -4px; right: -4px;
+            width: 18px; height: 18px;
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-radius: 50%;
+            font-size: 10px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* ── UPLOAD OPTION ────────────────────────────────────────────────── */
+        .upload-option {
+            grid-column: span 2;
+            border-style: dashed;
+            font-size: 13px;
+            color: var(--text-muted);
+            gap: 6px;
+            flex-direction: column;
+        }
+        .upload-option svg { width: 22px; height: 22px; stroke: var(--text-muted); stroke-width: 1.5; fill: none; }
+        .upload-option:hover svg { stroke: var(--accent); }
+        .upload-option:hover { color: var(--accent); }
+
+        /* ── FORM ELEMENTS ────────────────────────────────────────────────── */
+        .form-group { margin-bottom: 20px; }
+        .form-label {
+            display: block; font-size: 12px; font-weight: 500;
+            color: var(--text-secondary); margin-bottom: 6px;
+            letter-spacing: 0.3px; text-transform: uppercase;
+        }
+        .input-wrapper {
+            display: flex; align-items: center;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0 14px; height: 48px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .input-wrapper:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .input-icon {
+            width: 18px; height: 18px; stroke: var(--text-muted);
+            stroke-width: 1.8; fill: none; flex-shrink: 0; margin-right: 10px;
+        }
+        .input-wrapper:focus-within .input-icon { stroke: var(--accent); }
+        .form-input {
+            flex: 1; background: transparent; border: none; outline: none;
+            color: var(--text-primary); font-family: 'Outfit', sans-serif;
+            font-size: 14px; height: 100%;
+        }
+        .form-input::placeholder { color: var(--text-muted); }
+        .username-hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; padding-left: 2px; }
+        .username-hint.error { color: var(--negative); }
+        .username-hint.success { color: var(--positive); }
+        .char-counter {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px; color: var(--text-muted); flex-shrink: 0;
+        }
+
+        /* ── BUTTONS ──────────────────────────────────────────────────────── */
+        .btn-primary {
+            width: 100%; height: 52px; border: none; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+            color: var(--bg-primary); font-family: 'Outfit', sans-serif;
+            font-size: 15px; font-weight: 700; letter-spacing: 0.8px;
+            text-transform: uppercase; cursor: pointer; transition: all 0.2s ease;
+            margin-top: 8px;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.25);
+        }
+        .btn-primary:active:not(:disabled) { transform: translateY(0); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-spinner {
+            display: inline-block; width: 18px; height: 18px;
+            border: 2px solid transparent; border-top-color: var(--bg-primary);
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+            vertical-align: middle; margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── ALERT ────────────────────────────────────────────────────────── */
+        .alert {
+            display: none; padding: 12px 14px; border-radius: 8px;
+            font-size: 13px; margin-bottom: 18px;
+            align-items: flex-start; gap: 8px; line-height: 1.4;
+        }
+        .alert.show { display: flex; animation: fadeSlide 0.3s ease; }
+        .alert-icon { flex-shrink: 0; }
+        .alert.error { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); color: #fca5a5; }
+        .alert.success { background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2); color: #86efac; }
+        .alert.info { background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); color: #93c5fd; }
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── LOADING OVERLAY ──────────────────────────────────────────────── */
+        .loading-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: var(--bg-primary);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 16px;
+            transition: opacity 0.4s ease;
+        }
+        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .loading-spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .loading-text { font-size: 13px; color: var(--text-muted); letter-spacing: 0.5px; }
+
+        /* ── FOOTER ───────────────────────────────────────────────────────── */
+        .bottom-text { text-align: center; margin-top: 20px; font-size: 12px; color: var(--text-muted); }
+
+        #avatarFileInput { display: none; }
+
+        @media (max-width: 480px) {
+            .profile-card { padding: 28px 20px; }
+            .avatar-grid { grid-template-columns: repeat(5, 1fr); gap: 8px; }
+            .avatar-option { font-size: 24px; }
+            .upload-option { grid-column: span 2; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Cargando perfil...</div>
+    </div>
+
+    <div class="profile-wrapper">
+        <div class="logo-section">
+            <div class="logo-badge">DT</div>
+            <div class="logo-title"><span class="brand">DONTRADING</span> <span class="pro">Pro</span></div>
+        </div>
+
+        <div class="profile-card">
+
+            <div class="alert" id="alertBox">
+                <span class="alert-icon" id="alertIcon"></span>
+                <span id="alertText"></span>
+            </div>
+
+            <div class="step-header">
+                <div class="step-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Último paso
+                </div>
+                <h1 class="step-title">Configura tu perfil</h1>
+                <p class="step-subtitle">Elige un nombre de usuario y avatar para la comunidad DonTrading</p>
+            </div>
+
+            <div class="avatar-preview-section">
+                <div class="avatar-preview" id="avatarPreview">👤</div>
+            </div>
+
+            <label class="section-label">Elige tu avatar</label>
+            <div class="avatar-grid" id="avatarGrid">
+                <div class="avatar-option" data-avatar="🐂" onclick="selectAvatar(this)">🐂</div>
+                <div class="avatar-option" data-avatar="🐻" onclick="selectAvatar(this)">🐻</div>
+                <div class="avatar-option" data-avatar="🦈" onclick="selectAvatar(this)">🦈</div>
+                <div class="avatar-option" data-avatar="🦅" onclick="selectAvatar(this)">🦅</div>
+                <div class="avatar-option" data-avatar="🐺" onclick="selectAvatar(this)">🐺</div>
+                <div class="avatar-option" data-avatar="🦁" onclick="selectAvatar(this)">🦁</div>
+                <div class="avatar-option" data-avatar="🐉" onclick="selectAvatar(this)">🐉</div>
+                <div class="avatar-option" data-avatar="🦊" onclick="selectAvatar(this)">🦊</div>
+                <div class="avatar-option" data-avatar="🐯" onclick="selectAvatar(this)">🐯</div>
+                <div class="avatar-option" data-avatar="🦉" onclick="selectAvatar(this)">🦉</div>
+                <div class="avatar-option upload-option" onclick="document.getElementById('avatarFileInput').click()">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Subir foto
+                </div>
+            </div>
+            <input type="file" id="avatarFileInput" accept="image/*" onchange="handleAvatarUpload(event)">
+
+            <div class="form-group">
+                <label class="form-label">Nombre de usuario</label>
+                <div class="input-wrapper">
+                    <svg class="input-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <input type="text" class="form-input" id="usernameInput"
+                           placeholder="ej: trader_pro_2026"
+                           maxlength="20" autocomplete="off"
+                           oninput="validateUsername()">
+                    <span class="char-counter" id="charCounter">0/20</span>
+                </div>
+                <p class="username-hint" id="usernameHint">Mínimo 3 caracteres. Solo letras, números y guión bajo.</p>
+            </div>
+
+            <button class="btn-primary" id="btnSaveProfile" onclick="saveProfile()" disabled>
+                GUARDAR Y ENTRAR
+            </button>
+        </div>
+
+        <div class="bottom-text">DONTRADING &copy; 2026 &middot; Todos los derechos reservados</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FIREBASE SDK (compat — misma versión que login.html)                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+    <script>
+        // ═════════════════════════════════════════════════════════════════════════════
+        // DONTRADING — COMPLETAR PERFIL v1.0 (Onboarding)
+        //
+        // Colección destino: "usuarios"
+        // Campos: uid, username, displayUsername, email, phone,
+        //         avatarUrl, tipoRegistro, fechaCreacion
+        //
+        // Listos para consumir desde un Chat de Firebase:
+        //   → uid, username, avatarUrl
+        // ═════════════════════════════════════════════════════════════════════════════
+
+        var firebaseConfig = {
+            apiKey: "AIzaSyAdKShZMYYdmZ3bkmaDWsEhsLsT0YIgz-8",
+            authDomain: "dontrading-pro.firebaseapp.com",
+            projectId: "dontrading-pro",
+            storageBucket: "dontrading-pro.firebasestorage.app",
+            messagingSenderId: "684854856085",
+            appId: "1:684854856085:web:fd18dc2c46ff13ea81ce9c",
+            measurementId: "G-FYNX14F2VY"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        var auth    = firebase.auth();
+        var db      = firebase.firestore();
+        var storage = firebase.storage();
+
+        // ─── STATE ──────────────────────────────────────────────────────────
+        var currentUser        = null;
+        var selectedAvatar     = '';
+        var customAvatarFile   = null;
+        var customAvatarDataUrl = '';
+
+        // ═════════════════════════════════════════════════════════════════════
+        // AUTH GUARD
+        // ═════════════════════════════════════════════════════════════════════
+        auth.onAuthStateChanged(async function(user) {
+            if (!user) {
+                console.warn('⚠️ [PERFIL] No autenticado → login.html');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            currentUser = user;
+            console.log('✅ [PERFIL] UID:', user.uid, '|', user.email || user.phoneNumber);
+
+            // Si ya tiene perfil completo → dashboard
+            try {
+                var docSnap = await db.collection('usuarios').doc(user.uid).get();
+                if (docSnap.exists && docSnap.data().username) {
+                    console.log('✅ [PERFIL] Perfil ya existe → dashboard.html');
+                    window.location.href = 'dashboard.html';
+                    return;
+                }
+            } catch (err) {
+                console.error('❌ [PERFIL] Error verificando perfil:', err);
+            }
+
+            // Pre-llenar username
+            if (user.displayName) {
+                var suggested = user.displayName
+                    .toLowerCase()
+                    .replace(/\s+/g, '_')
+                    .replace(/[^a-z0-9_]/g, '')
+                    .substring(0, 20);
+                document.getElementById('usernameInput').value = suggested;
+                validateUsername();
+            }
+
+            // Pre-llenar avatar si tiene foto de Google
+            if (user.photoURL) {
+                selectedAvatar = 'google_photo';
+                var preview = document.getElementById('avatarPreview');
+                preview.innerHTML = '<img src="' + user.photoURL + '" alt="Avatar">';
+                preview.classList.add('selected');
+                checkFormReady();
+            }
+
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        });
+
+        // ═════════════════════════════════════════════════════════════════════
+        // AVATAR
+        // ═════════════════════════════════════════════════════════════════════
+        function selectAvatar(el) {
+            document.querySelectorAll('.avatar-option').forEach(function(o) { o.classList.remove('active'); });
+            el.classList.add('active');
+            selectedAvatar = el.getAttribute('data-avatar');
+            customAvatarFile = null;
+            customAvatarDataUrl = '';
+            var p = document.getElementById('avatarPreview');
+            p.innerHTML = selectedAvatar;
+            p.classList.add('selected');
+            checkFormReady();
+        }
+
+        function handleAvatarUpload(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) { showAlert('error', 'Solo imágenes.'); return; }
+            if (file.size > 2 * 1024 * 1024) { showAlert('error', 'Máximo 2MB.'); return; }
+
+            customAvatarFile = file;
+            selectedAvatar = 'custom';
+            document.querySelectorAll('.avatar-option').forEach(function(o) { o.classList.remove('active'); });
+            document.querySelector('.upload-option').classList.add('active');
+
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                customAvatarDataUrl = e.target.result;
+                var p = document.getElementById('avatarPreview');
+                p.innerHTML = '<img src="' + customAvatarDataUrl + '" alt="Avatar">';
+                p.classList.add('selected');
+            };
+            reader.readAsDataURL(file);
+            checkFormReady();
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // USERNAME
+        // ═════════════════════════════════════════════════════════════════════
+        function validateUsername() {
+            var input = document.getElementById('usernameInput');
+            var hint  = document.getElementById('usernameHint');
+            var counter = document.getElementById('charCounter');
+            var val = input.value.trim();
+            counter.textContent = val.length + '/20';
+
+            if (val.length === 0) {
+                hint.textContent = 'Mínimo 3 caracteres. Solo letras, números y guión bajo.';
+                hint.className = 'username-hint';
+            } else if (val.length < 3) {
+                hint.textContent = 'Muy corto. Mínimo 3 caracteres.';
+                hint.className = 'username-hint error';
+            } else if (!/^[a-zA-Z0-9_]+$/.test(val)) {
+                hint.textContent = 'Solo letras, números y guión bajo (_).';
+                hint.className = 'username-hint error';
+            } else {
+                hint.textContent = '¡Nombre válido!';
+                hint.className = 'username-hint success';
+            }
+            checkFormReady();
+            return /^[a-zA-Z0-9_]{3,20}$/.test(val);
+        }
+
+        function checkFormReady() {
+            var u = document.getElementById('usernameInput').value.trim();
+            document.getElementById('btnSaveProfile').disabled =
+                !(/^[a-zA-Z0-9_]{3,20}$/.test(u) && selectedAvatar !== '');
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // SAVE → Firestore "usuarios"
+        // ═════════════════════════════════════════════════════════════════════
+        async function saveProfile() {
+            if (!currentUser) { showAlert('error', 'Sesión no encontrada.'); return; }
+            var username = document.getElementById('usernameInput').value.trim();
+            if (!validateUsername() || !selectedAvatar) return;
+
+            var btn = document.getElementById('btnSaveProfile');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="btn-spinner"></span>Guardando...';
+
+            try {
+                // 1. Username único
+                var check = await db.collection('usuarios')
+                    .where('username', '==', username.toLowerCase())
+                    .limit(1).get();
+
+                if (!check.empty && check.docs[0].id !== currentUser.uid) {
+                    showAlert('error', 'Ese nombre de usuario ya está en uso.');
+                    btn.disabled = false;
+                    btn.textContent = 'GUARDAR Y ENTRAR';
+                    return;
+                }
+
+                // 2. Avatar URL
+                var avatarUrl = '';
+                if (selectedAvatar === 'custom' && customAvatarFile) {
+                    try {
+                        var ref = storage.ref('avatars/' + currentUser.uid + '/profile.jpg');
+                        var snap = await ref.put(customAvatarFile);
+                        avatarUrl = await snap.ref.getDownloadURL();
+                    } catch (e) {
+                        console.error('❌ Upload error:', e);
+                        avatarUrl = '🐂';
+                    }
+                } else if (selectedAvatar === 'google_photo') {
+                    avatarUrl = currentUser.photoURL || '🐂';
+                } else {
+                    avatarUrl = selectedAvatar;
+                }
+
+                // 3. Tipo de registro
+                var tipoRegistro = 'correo electrónico';
+                if (currentUser.providerData) {
+                    var provs = currentUser.providerData.map(function(p) { return p.providerId; });
+                    if (provs.indexOf('google.com') !== -1) tipoRegistro = 'google';
+                    else if (provs.indexOf('phone') !== -1) tipoRegistro = 'teléfono';
+                }
+
+                // 4. Guardar en Firestore
+                var data = {
+                    uid:            currentUser.uid,
+                    username:       username.toLowerCase(),
+                    displayUsername: username,
+                    email:          currentUser.email || '',
+                    phone:          currentUser.phoneNumber || '',
+                    avatarUrl:      avatarUrl,
+                    tipoRegistro:   tipoRegistro,
+                    fechaCreacion:  firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                await db.collection('usuarios').doc(currentUser.uid).set(data);
+                console.log('✅ [PERFIL] Guardado:', data);
+
+                // 5. Actualizar Auth profile
+                try {
+                    var upd = { displayName: username };
+                    if (avatarUrl && avatarUrl.startsWith('http')) upd.photoURL = avatarUrl;
+                    await currentUser.updateProfile(upd);
+                } catch (e) { /* no bloquea */ }
+
+                // 6. Dashboard
+                showAlert('success', '¡Perfil creado! Bienvenido a DonTrading.');
+                btn.innerHTML = '✅ ¡LISTO!';
+                setTimeout(function() { window.location.href = 'dashboard.html'; }, 1200);
+
+            } catch (err) {
+                console.error('❌ [PERFIL] Error:', err);
+                showAlert('error', 'Error: ' + (err.message || err));
+                btn.disabled = false;
+                btn.textContent = 'GUARDAR Y ENTRAR';
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // ALERTS
+        // ═════════════════════════════════════════════════════════════════════
+        function showAlert(type, msg) {
+            var box = document.getElementById('alertBox');
+            box.className = 'alert show ' + type;
+            document.getElementById('alertText').textContent = msg;
+            document.getElementById('alertIcon').textContent = type === 'error' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️';
+        }
+
+        console.log('📝 DONTRADING — Completar Perfil v1.0');
+        console.log('📦 Colección: "usuarios" | Campos chat: uid, username, avatarUrl');
+    </script>
+</body>
+</html>

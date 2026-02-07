@@ -607,681 +607,1079 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CODE LOGIC                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <script>
-// ═════════════════════════════════════════════════════════════════════════════
-// DONTRADING — AUTH MODULE v2.1
-// ✅ Google: popup con fallback a redirect
-// ✅ Email: registro directo + envío de verificación
-// ✅ Phone: OTP con reCAPTCHA invisible
-// ✅ Debug: banner visual + logs detallados
-// ✅ Redirect: getRedirectResult() al cargar página
-// ═════════════════════════════════════════════════════════════════════════════
+        // ═════════════════════════════════════════════════════════════════════════════
+        // DONTRADING — AUTH MODULE v3.0 — ONBOARDING EDITION
+        // ✅ Google: popup con fallback a redirect + auto-perfil en "usuarios"
+        // ✅ Email: registro + verificación obligatoria + onboarding
+        // ✅ Phone: OTP con reCAPTCHA invisible + onboarding
+        // ✅ Debug: banner visual + logs detallados
+        // ✅ Redirect: getRedirectResult() al cargar página
+        // ✅ Widget de verificación de email post-registro
+        // ✅ NEW: Onboarding — verifica colección "usuarios" antes de redirigir
+        // ✅ NEW: Google auto-crea perfil, Email/Phone → completar-perfil.html
+        // ═════════════════════════════════════════════════════════════════════════════
 
-// ─── FIREBASE CONFIG ─────────────────────────────────────────────────────────
-var firebaseConfig = {
-    apiKey: "AIzaSyAdKShZMYYdmZ3bkmaDWsEhsLsT0YIgz-8",
-    authDomain: "dontrading-pro.firebaseapp.com",
-    projectId: "dontrading-pro",
-    storageBucket: "dontrading-pro.firebasestorage.app",
-    messagingSenderId: "684854856085",
-    appId: "1:684854856085:web:fd18dc2c46ff13ea81ce9c",
-    measurementId: "G-FYNX14F2VY"
-};
+        // ─── FIREBASE CONFIG ─────────────────────────────────────────────────────────
+        var firebaseConfig = {
+            apiKey: "AIzaSyAdKShZMYYdmZ3bkmaDWsEhsLsT0YIgz-8",
+            authDomain: "dontrading-pro.firebaseapp.com",
+            projectId: "dontrading-pro",
+            storageBucket: "dontrading-pro.firebasestorage.app",
+            messagingSenderId: "684854856085",
+            appId: "1:684854856085:web:fd18dc2c46ff13ea81ce9c",
+            measurementId: "G-FYNX14F2VY"
+        };
 
-firebase.initializeApp(firebaseConfig);
-var auth = firebase.auth();
-var db   = firebase.firestore();
-auth.languageCode = 'es';
+        firebase.initializeApp(firebaseConfig);
+        var auth = firebase.auth();
+        var db   = firebase.firestore();
+        auth.languageCode = 'es';
 
-// ─── STATE ───────────────────────────────────────────────────────────────────
-var confirmationResultLogin    = null;
-var confirmationResultRegister = null;
-var recaptchaVerifierLogin     = null;
-var recaptchaVerifierRegister  = null;
-var pendingRegPhoneData        = {};
-var isRedirecting              = false;
+        // ─── STATE ───────────────────────────────────────────────────────────────────
+        var confirmationResultLogin    = null;
+        var confirmationResultRegister = null;
+        var recaptchaVerifierLogin     = null;
+        var recaptchaVerifierRegister  = null;
+        var pendingRegPhoneData        = {};
+        var isRedirecting              = false;
+        var isWaitingEmailVerification = false;  // ← NUEVO: bloquea auto-redirect mientras espera verificación
 
-// ─── Google Provider — configuración completa ────────────────────────────────
-var googleProvider = new firebase.auth.GoogleAuthProvider();
-googleProvider.addScope('email');
-googleProvider.addScope('profile');
-googleProvider.setCustomParameters({
-    prompt: 'select_account'   // Siempre muestra selector de cuenta
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// DEBUG — Banner visual para errores (quitar en producción final)
-// Cambia DEBUG_MODE a false para ocultar
-// ═════════════════════════════════════════════════════════════════════════════
-var DEBUG_MODE = true;
-
-function debugLog(msg, data) {
-    console.log('🔍 ' + msg, data || '');
-    if (DEBUG_MODE) {
-        var banner = document.getElementById('debugBanner');
-        banner.classList.add('show');
-        banner.textContent = msg + (data ? ' → ' + JSON.stringify(data) : '');
-    }
-}
-
-function debugError(msg, err) {
-    console.error('❌ ' + msg, err);
-    if (DEBUG_MODE) {
-        var banner = document.getElementById('debugBanner');
-        banner.classList.add('show');
-        banner.style.borderColor = 'rgba(239, 68, 68, 0.3)';
-        banner.style.color = '#fca5a5';
-        banner.textContent = msg + ' → code: ' + (err.code || 'N/A') + ' | msg: ' + (err.message || err);
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ✅ CRITICAL FIX: getRedirectResult — captura el resultado de Google Redirect
-// Esto se ejecuta INMEDIATAMENTE al cargar la página.
-// Si el usuario fue redirigido a Google y volvió, esto captura su sesión.
-// ═════════════════════════════════════════════════════════════════════════════
-(async function checkRedirectResult() {
-    try {
-        debugLog('Checking getRedirectResult...');
-        var result = await auth.getRedirectResult();
-
-        if (result && result.user) {
-            debugLog('✅ Redirect result captured! UID: ' + result.user.uid);
-            isRedirecting = true;
-            await saveUserToFirestore(result.user, { provider: 'google' });
-            showAlert('success', '¡Bienvenido! Redirigiendo...');
-            redirectToDashboard(1200);
-        } else {
-            debugLog('No redirect result (normal page load)');
-        }
-    } catch (err) {
-        debugError('getRedirectResult error', err);
-        // Error común: account-exists-with-different-credential
-        if (err.code === 'auth/account-exists-with-different-credential') {
-            showAlert('error', 'Ya existe una cuenta con ese email usando otro método (teléfono o email). Inicia sesión con el método original.');
-        }
-    }
-})();
-
-// ═════════════════════════════════════════════════════════════════════════════
-// VIEW / TAB MANAGEMENT
-// ═════════════════════════════════════════════════════════════════════════════
-function showView(viewName) {
-    document.querySelectorAll('.form-view').forEach(function(v) { v.classList.remove('active'); });
-    var target = document.getElementById('view-' + viewName);
-    if (target) target.classList.add('active');
-    document.querySelectorAll('.switch-btn').forEach(function(btn) {
-        btn.classList.remove('active');
-        if (btn.getAttribute('data-view') === viewName) btn.classList.add('active');
-    });
-    document.getElementById('viewSwitcher').style.display = viewName === 'recovery' ? 'none' : 'flex';
-    hideAlert();
-}
-
-document.querySelectorAll('.switch-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() { showView(btn.getAttribute('data-view')); });
-});
-
-function switchMethod(context, method) {
-    document.querySelectorAll('.method-tab[data-context="' + context + '"]').forEach(function(tab) {
-        tab.classList.toggle('active', tab.getAttribute('data-method') === method);
-    });
-    var emailPanel = document.getElementById(context + '-email-panel');
-    var phonePanel = document.getElementById(context + '-phone-panel');
-    if (emailPanel) emailPanel.classList.toggle('active', method === 'email');
-    if (phonePanel) phonePanel.classList.toggle('active', method === 'phone');
-    hideAlert();
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ALERTS
-// ═════════════════════════════════════════════════════════════════════════════
-function showAlert(type, message) {
-    var box = document.getElementById('alertBox');
-    box.className = 'alert show ' + type;
-    document.getElementById('alertText').textContent = message;
-    document.getElementById('alertIcon').textContent = { error:'⚠️', success:'✅', info:'ℹ️' }[type] || '';
-}
-function hideAlert() { document.getElementById('alertBox').className = 'alert'; }
-
-// ═════════════════════════════════════════════════════════════════════════════
-// REDIRECT
-// ═════════════════════════════════════════════════════════════════════════════
-function redirectToDashboard(delay) {
-    delay = delay || 1200;
-    isRedirecting = true;
-    console.log('🚀 Redirect en ' + delay + 'ms');
-    setTimeout(function() { window.location.href = 'dashboard.html'; }, delay);
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// FIRESTORE HELPER
-// ═════════════════════════════════════════════════════════════════════════════
-async function saveUserToFirestore(user, extraData) {
-    extraData = extraData || {};
-    try {
-        var docRef = db.collection('users').doc(user.uid);
-        var doc = await docRef.get();
-
-        if (!doc.exists) {
-            await docRef.set({
-                name:      extraData.name || user.displayName || '',
-                email:     extraData.email || user.email || '',
-                phone:     extraData.phone || user.phoneNumber || '',
-                uid:       user.uid,
-                photoURL:  user.photoURL || '',
-                provider:  extraData.provider || 'unknown',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                plan:      'free',
-                verified:  true
-            });
-            debugLog('✅ Nuevo usuario en Firestore');
-        } else {
-            var update = { lastLogin: firebase.firestore.FieldValue.serverTimestamp() };
-            var existing = doc.data();
-            if (!existing.email && (extraData.email || user.email)) update.email = extraData.email || user.email;
-            if (!existing.phone && (extraData.phone || user.phoneNumber)) update.phone = extraData.phone || user.phoneNumber;
-            if (!existing.name && (extraData.name || user.displayName)) update.name = extraData.name || user.displayName;
-            if (!existing.photoURL && user.photoURL) update.photoURL = user.photoURL;
-            await docRef.update(update);
-            debugLog('✅ Usuario actualizado en Firestore');
-        }
-    } catch (err) {
-        debugError('Firestore save (no bloquea redirect)', err);
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// UTILITIES
-// ═════════════════════════════════════════════════════════════════════════════
-function cleanPhoneNumber(phone) {
-    var digits = phone.replace(/\D/g, '');
-    if (digits.length > 10) return '+' + digits;
-    return '+1' + digits;
-}
-function formatPhoneInput(input) {
-    var d = input.value.replace(/\D/g, '');
-    if (d.length >= 7) input.value = '(' + d.substring(0,3) + ') ' + d.substring(3,6) + '-' + d.substring(6,10);
-    else if (d.length >= 4) input.value = '(' + d.substring(0,3) + ') ' + d.substring(3);
-    else if (d.length > 0) input.value = '(' + d;
-}
-['loginPhone','regPhone','regEmailPhone'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.addEventListener('input', function() { formatPhoneInput(el); });
-});
-function togglePassword(inputId, btn) {
-    var input = document.getElementById(inputId);
-    var isPass = input.type === 'password';
-    input.type = isPass ? 'text' : 'password';
-    btn.innerHTML = isPass
-        ? '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22"/></svg>'
-        : '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
-}
-function setButtonLoading(btnId, loading) {
-    var btn = document.getElementById(btnId);
-    if (!btn) return;
-    if (loading) {
-        btn.disabled = true;
-        btn.setAttribute('data-original-text', btn.textContent);
-        btn.innerHTML = '<span class="btn-spinner"></span>Procesando...';
-    } else {
-        btn.disabled = false;
-        btn.textContent = btn.getAttribute('data-original-text') || 'Enviar';
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// OTP
-// ═════════════════════════════════════════════════════════════════════════════
-function setupOTPInputs(groupId) {
-    var inputs = document.querySelectorAll('#' + groupId + ' .otp-digit');
-    inputs.forEach(function(input, i) {
-        input.addEventListener('input', function(e) {
-            var v = e.target.value.replace(/\D/g, '');
-            e.target.value = v.charAt(0) || '';
-            if (v && i < inputs.length - 1) inputs[i + 1].focus();
+        // ─── Google Provider — configuración completa ────────────────────────────────
+        var googleProvider = new firebase.auth.GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        googleProvider.setCustomParameters({
+            prompt: 'select_account'
         });
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Backspace' && !e.target.value && i > 0) inputs[i - 1].focus();
-        });
-        input.addEventListener('paste', function(e) {
-            e.preventDefault();
-            var pd = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
-            for (var j = 0; j < inputs.length && j < pd.length; j++) inputs[j].value = pd.charAt(j);
-            inputs[Math.min(pd.length, inputs.length - 1)].focus();
-        });
-    });
-}
-function getOTPValue(groupId) {
-    var c = ''; document.querySelectorAll('#' + groupId + ' .otp-digit').forEach(function(i) { c += i.value; }); return c;
-}
-function clearOTP(groupId) {
-    document.querySelectorAll('#' + groupId + ' .otp-digit').forEach(function(i) { i.value = ''; });
-}
-setupOTPInputs('loginOtpGroup');
-setupOTPInputs('regOtpGroup');
 
-// ═════════════════════════════════════════════════════════════════════════════
-// RECAPTCHA
-// ═════════════════════════════════════════════════════════════════════════════
-function setupRecaptchaInvisible(buttonId) {
-    return new firebase.auth.RecaptchaVerifier(buttonId, {
-        'size': 'invisible',
-        'callback': function() { debugLog('reCAPTCHA OK: ' + buttonId); },
-        'expired-callback': function() { debugLog('reCAPTCHA expired'); }
-    });
-}
-function safeResetRecaptcha(v) {
-    try { if (v) v.clear(); } catch(e) { /* silent */ }
-    return null;
-}
+        // ═════════════════════════════════════════════════════════════════════════════
+        // DEBUG
+        // ═════════════════════════════════════════════════════════════════════════════
+        var DEBUG_MODE = true;
 
-// ═════════════════════════════════════════════════════════════════════════════
-// ██  GOOGLE SIGN-IN — Popup con fallback a Redirect
-// ═════════════════════════════════════════════════════════════════════════════
-async function handleGoogleSignIn() {
-    hideAlert();
-    var btn = document.getElementById('btnGoogleLogin');
-    if (btn) { btn.disabled = true; btn.textContent = 'Conectando...'; }
-
-    debugLog('Iniciando Google Sign-In (popup)...');
-
-    try {
-        // ── Intento 1: Popup ──
-        var result = await auth.signInWithPopup(googleProvider);
-        var user = result.user;
-        debugLog('✅ Google popup exitoso! UID: ' + user.uid + ', email: ' + user.email);
-
-        await saveUserToFirestore(user, { provider: 'google' });
-        showAlert('success', '¡Bienvenido! Redirigiendo...');
-        redirectToDashboard(1200);
-
-    } catch (err) {
-        debugError('Google popup error', err);
-
-        // ── Fallback: Redirect si popup fue bloqueado ──
-        if (err.code === 'auth/popup-blocked' ||
-            err.code === 'auth/popup-closed-by-user' ||
-            err.code === 'auth/cancelled-popup-request') {
-
-            debugLog('Popup bloqueado/cerrado, intentando redirect...');
-            showAlert('info', 'Redirigiendo a Google para autenticación...');
-
-            try {
-                await auth.signInWithRedirect(googleProvider);
-                // La página se recargará y getRedirectResult() captura el resultado
-            } catch (redirectErr) {
-                debugError('Google redirect error', redirectErr);
-                showAlert('error', 'Error al redirigir a Google: ' + redirectErr.message);
+        function debugLog(msg, data) {
+            console.log('🔍 ' + msg, data || '');
+            if (DEBUG_MODE) {
+                var banner = document.getElementById('debugBanner');
+                banner.classList.add('show');
+                banner.textContent = msg + (data ? ' → ' + JSON.stringify(data) : '');
             }
-
-        } else if (err.code === 'auth/account-exists-with-different-credential') {
-            showAlert('error', 'Ya existe una cuenta con ese email usando otro método. Intenta con email/contraseña o teléfono.');
-
-        } else if (err.code === 'auth/unauthorized-domain') {
-            showAlert('error', 'Este dominio no está autorizado en Firebase. Agrega "' + window.location.hostname + '" en Firebase Console → Authentication → Settings → Authorized domains.');
-            debugError('UNAUTHORIZED DOMAIN', { hostname: window.location.hostname, origin: window.location.origin });
-
-        } else if (err.code === 'auth/internal-error') {
-            showAlert('error', 'Error interno de Firebase. Verifica que el OAuth consent screen esté configurado en Google Cloud Console.');
-
-        } else if (err.code === 'auth/operation-not-allowed') {
-            showAlert('error', 'Google Sign-In no está habilitado. Actívalo en Firebase Console → Authentication → Sign-in method → Google.');
-
-        } else {
-            showAlert('error', 'Error con Google: ' + translateFirebaseError(err.code));
-        }
-    }
-
-    if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continuar con Google'; }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ██  LOGIN: EMAIL + PASSWORD
-// ═════════════════════════════════════════════════════════════════════════════
-async function handleLoginEmail() {
-    hideAlert();
-    var email = document.getElementById('loginEmail').value.trim();
-    var password = document.getElementById('loginEmailPassword').value;
-
-    if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
-    if (!password) { showAlert('error', 'Ingresa tu contraseña.'); return; }
-
-    setButtonLoading('btnLoginEmail', true);
-    debugLog('Login email: ' + email);
-
-    try {
-        var result = await auth.signInWithEmailAndPassword(email, password);
-        debugLog('✅ Login email OK. UID: ' + result.user.uid);
-        await saveUserToFirestore(result.user, { provider: 'email' });
-        showAlert('success', '¡Bienvenido de vuelta! Redirigiendo...');
-        redirectToDashboard(1200);
-    } catch (err) {
-        debugError('Login email error', err);
-        if (err.code === 'auth/user-not-found') {
-            showAlert('error', 'No hay cuenta con ese email. ¿Quieres registrarte?');
-        } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-            showAlert('error', 'Contraseña incorrecta.');
-        } else {
-            showAlert('error', translateFirebaseError(err.code));
-        }
-    }
-    setButtonLoading('btnLoginEmail', false);
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ██  LOGIN: PHONE (Firestore lookup → email+pass, fallback OTP)
-// ═════════════════════════════════════════════════════════════════════════════
-async function handleLoginPhone() {
-    hideAlert();
-    var phone = document.getElementById('loginPhone').value.trim();
-    var password = document.getElementById('loginPhonePassword').value;
-
-    if (!phone) { showAlert('error', 'Ingresa tu número de teléfono.'); return; }
-    if (phone.replace(/\D/g, '').length < 10) { showAlert('error', 'El número debe tener al menos 10 dígitos.'); return; }
-    if (!password) { showAlert('error', 'Ingresa tu contraseña.'); return; }
-
-    setButtonLoading('btnLoginPhone', true);
-    var fullPhone = cleanPhoneNumber(phone);
-    debugLog('Login phone: ' + fullPhone);
-
-    try {
-        var snapshot = await db.collection('users').where('phone', '==', fullPhone).limit(1).get();
-
-        if (snapshot.empty) {
-            showAlert('error', 'No se encontró cuenta con ese número. ¿Quieres registrarte?');
-            setButtonLoading('btnLoginPhone', false);
-            return;
         }
 
-        var userData = snapshot.docs[0].data();
-        debugLog('Usuario encontrado, email: ' + (userData.email || 'N/A'));
+        function debugError(msg, err) {
+            console.error('❌ ' + msg, err);
+            if (DEBUG_MODE) {
+                var banner = document.getElementById('debugBanner');
+                banner.classList.add('show');
+                banner.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                banner.style.color = '#fca5a5';
+                banner.textContent = msg + ' → code: ' + (err.code || 'N/A') + ' | msg: ' + (err.message || err);
+            }
+        }
 
-        if (userData.email) {
+        // ═════════════════════════════════════════════════════════════════════════════
+        // getRedirectResult — Google Redirect
+        // ═════════════════════════════════════════════════════════════════════════════
+        (async function checkRedirectResult() {
             try {
-                var result = await auth.signInWithEmailAndPassword(userData.email, password);
-                debugLog('✅ Login phone→email OK');
-                showAlert('success', '¡Bienvenido de vuelta! Redirigiendo...');
-                redirectToDashboard(1200);
-            } catch (emailErr) {
-                debugError('Login phone→email error', emailErr);
-                if (emailErr.code === 'auth/wrong-password' || emailErr.code === 'auth/invalid-credential') {
-                    showAlert('error', 'Contraseña incorrecta.');
+                debugLog('Checking getRedirectResult...');
+                var result = await auth.getRedirectResult();
+
+                if (result && result.user) {
+                    debugLog('✅ Redirect result captured! UID: ' + result.user.uid);
+                    isRedirecting = true;
+                    await saveUserToFirestore(result.user, { provider: 'google' });
+                    showAlert('success', '¡Bienvenido! Verificando perfil...');
+                    await checkProfileAndRedirect(result.user, 'google', 1200);
                 } else {
-                    showAlert('error', translateFirebaseError(emailErr.code));
+                    debugLog('No redirect result (normal page load)');
+                }
+            } catch (err) {
+                debugError('getRedirectResult error', err);
+                if (err.code === 'auth/account-exists-with-different-credential') {
+                    showAlert('error', 'Ya existe una cuenta con ese email usando otro método (teléfono o email). Inicia sesión con el método original.');
                 }
             }
-        } else {
-            showAlert('info', 'Verificación por SMS necesaria...');
-            await sendLoginOTP(fullPhone);
-        }
-    } catch (err) {
-        debugError('Login phone error', err);
-        showAlert('error', 'Error: ' + (err.message || err));
-    }
-    setButtonLoading('btnLoginPhone', false);
-}
+        })();
 
-async function sendLoginOTP(phoneNumber) {
-    try {
-        recaptchaVerifierLogin = safeResetRecaptcha(recaptchaVerifierLogin);
-        recaptchaVerifierLogin = setupRecaptchaInvisible('btnLoginPhone');
-        confirmationResultLogin = await auth.signInWithPhoneNumber(phoneNumber, recaptchaVerifierLogin);
-        document.getElementById('loginPhoneVerify').classList.add('active');
-        document.getElementById('btnLoginPhone').style.display = 'none';
-        document.getElementById('loginVerifyPhone').textContent = phoneNumber;
-        showAlert('success', 'Código SMS enviado.');
-        clearOTP('loginOtpGroup');
-        document.querySelector('#loginOtpGroup .otp-digit').focus();
-    } catch (err) {
-        debugError('SMS login error', err);
-        showAlert('error', 'Error SMS: ' + translateFirebaseError(err.code));
-        recaptchaVerifierLogin = safeResetRecaptcha(recaptchaVerifierLogin);
-    }
-}
-
-async function verifyLoginOTP() {
-    var code = getOTPValue('loginOtpGroup');
-    if (code.length !== 6) { showAlert('error', 'Código de 6 dígitos requerido.'); return; }
-    setButtonLoading('btnVerifyLogin', true);
-    try {
-        var result = await confirmationResultLogin.confirm(code);
-        debugLog('✅ Login OTP OK');
-        await saveUserToFirestore(result.user, { provider: 'phone' });
-        showAlert('success', '¡Verificado! Redirigiendo...');
-        redirectToDashboard(1200);
-    } catch (err) {
-        showAlert('error', 'Código incorrecto.');
-        clearOTP('loginOtpGroup');
-    }
-    setButtonLoading('btnVerifyLogin', false);
-}
-
-function resendLoginCode() {
-    sendLoginOTP(cleanPhoneNumber(document.getElementById('loginPhone').value.trim()));
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ██  REGISTER: EMAIL (directo, sin SMS) + Email Verification
-// ═════════════════════════════════════════════════════════════════════════════
-async function handleRegisterEmail() {
-    hideAlert();
-    var name     = document.getElementById('regEmailName').value.trim();
-    var email    = document.getElementById('regEmail').value.trim();
-    var password = document.getElementById('regEmailPassword').value;
-    var phone    = document.getElementById('regEmailPhone').value.trim();
-
-    if (!name) { showAlert('error', 'Ingresa tu nombre.'); return; }
-    if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
-    if (!password) { showAlert('error', 'Ingresa una contraseña.'); return; }
-    if (password.length < 6) { showAlert('error', 'Mínimo 6 caracteres.'); return; }
-
-    setButtonLoading('btnRegisterEmail', true);
-    debugLog('Register email: ' + email);
-
-    try {
-        var result = await auth.createUserWithEmailAndPassword(email, password);
-        var user = result.user;
-        debugLog('✅ Cuenta email creada. UID: ' + user.uid);
-
-        // Update profile name
-        try { await user.updateProfile({ displayName: name }); } catch(e) { /* silent */ }
-
-        // ✅ FIX: Enviar email de verificación
-        try {
-            await user.sendEmailVerification({
-                url: window.location.origin + '/dashboard.html',  // URL de retorno
-                handleCodeInApp: false
+        // ═════════════════════════════════════════════════════════════════════════════
+        // VIEW / TAB MANAGEMENT
+        // ═════════════════════════════════════════════════════════════════════════════
+        function showView(viewName) {
+            document.querySelectorAll('.form-view').forEach(function(v) { v.classList.remove('active'); });
+            var target = document.getElementById('view-' + viewName);
+            if (target) target.classList.add('active');
+            document.querySelectorAll('.switch-btn').forEach(function(btn) {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-view') === viewName) btn.classList.add('active');
             });
-            debugLog('✅ Email de verificación enviado a: ' + email);
-        } catch (verifyErr) {
-            debugError('sendEmailVerification error (no bloquea)', verifyErr);
+            document.getElementById('viewSwitcher').style.display = viewName === 'recovery' ? 'none' : 'flex';
+
+            // ── Ocultar widget de verificación si cambia de vista ──
+            hideEmailVerificationWidget();
+            hideAlert();
         }
 
-        // Save to Firestore
-        await saveUserToFirestore(user, {
-            name: name, email: email,
-            phone: phone ? cleanPhoneNumber(phone) : '',
-            provider: 'email'
+        document.querySelectorAll('.switch-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() { showView(btn.getAttribute('data-view')); });
         });
 
-        showAlert('success', '¡Cuenta creada! Revisa tu email para verificar. Redirigiendo...');
-        redirectToDashboard(2000);
-
-    } catch (err) {
-        debugError('Register email error', err);
-        if (err.code === 'auth/email-already-in-use') {
-            showAlert('error', 'Ya existe cuenta con ese email. ¿Quieres iniciar sesión?');
-        } else if (err.code === 'auth/weak-password') {
-            showAlert('error', 'Contraseña muy débil. Usa al menos 6 caracteres.');
-        } else {
-            showAlert('error', translateFirebaseError(err.code));
+        function switchMethod(context, method) {
+            document.querySelectorAll('.method-tab[data-context="' + context + '"]').forEach(function(tab) {
+                tab.classList.toggle('active', tab.getAttribute('data-method') === method);
+            });
+            var emailPanel = document.getElementById(context + '-email-panel');
+            var phonePanel = document.getElementById(context + '-phone-panel');
+            if (emailPanel) emailPanel.classList.toggle('active', method === 'email');
+            if (phonePanel) phonePanel.classList.toggle('active', method === 'phone');
+            hideAlert();
         }
-    }
-    setButtonLoading('btnRegisterEmail', false);
-}
 
-// ═════════════════════════════════════════════════════════════════════════════
-// ██  REGISTER: PHONE + OTP
-// ═════════════════════════════════════════════════════════════════════════════
-async function handleRegisterPhone() {
-    hideAlert();
-    var name     = document.getElementById('regPhoneName').value.trim();
-    var phone    = document.getElementById('regPhone').value.trim();
-    var password = document.getElementById('regPhonePassword').value;
-    var email    = document.getElementById('regPhoneEmail').value.trim();
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ALERTS
+        // ═════════════════════════════════════════════════════════════════════════════
+        function showAlert(type, message) {
+            var box = document.getElementById('alertBox');
+            box.className = 'alert show ' + type;
+            document.getElementById('alertText').textContent = message;
+            document.getElementById('alertIcon').textContent = { error:'⚠️', success:'✅', info:'ℹ️' }[type] || '';
+        }
+        function hideAlert() { document.getElementById('alertBox').className = 'alert'; }
 
-    if (!name) { showAlert('error', 'Ingresa tu nombre.'); return; }
-    if (!phone || phone.replace(/\D/g, '').length < 10) { showAlert('error', 'Teléfono válido requerido.'); return; }
-    if (!password) { showAlert('error', 'Ingresa una contraseña.'); return; }
-    if (password.length < 6) { showAlert('error', 'Mínimo 6 caracteres.'); return; }
+        // ═════════════════════════════════════════════════════════════════════════════
+        // REDIRECT
+        // ═════════════════════════════════════════════════════════════════════════════
+        function redirectToDashboard(delay) {
+            delay = delay || 1200;
+            isRedirecting = true;
+            console.log('🚀 Redirect en ' + delay + 'ms');
+            setTimeout(function() { window.location.href = 'dashboard.html'; }, delay);
+        }
 
-    pendingRegPhoneData = { name: name, phone: cleanPhoneNumber(phone), password: password, email: email };
-    setButtonLoading('btnRegisterPhone', true);
-    debugLog('Register phone: ' + pendingRegPhoneData.phone);
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  ONBOARDING — Verifica perfil en colección "usuarios" antes de redirigir
+        // ═════════════════════════════════════════════════════════════════════════════
+        /**
+         * Flujo:
+         *   1) Busca doc en "usuarios/{uid}"
+         *   2) Si existe y tiene username → dashboard.html
+         *   3) Si NO existe y provider es 'google' → crea perfil auto → dashboard.html
+         *   4) Si NO existe y provider es 'email'|'phone' → completar-perfil.html
+         *
+         * Estructura "usuarios":
+         *   uid, username, displayUsername, email, phone,
+         *   avatarUrl, tipoRegistro, fechaCreacion
+         */
+        async function checkProfileAndRedirect(user, provider, delay) {
+            delay = delay || 1200;
+            isRedirecting = true;
 
-    try {
-        recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
-        recaptchaVerifierRegister = setupRecaptchaInvisible('btnRegisterPhone');
-        confirmationResultRegister = await auth.signInWithPhoneNumber(pendingRegPhoneData.phone, recaptchaVerifierRegister);
-        document.getElementById('registerPhoneVerify').classList.add('active');
-        document.getElementById('btnRegisterPhone').style.display = 'none';
-        document.getElementById('regVerifyPhone').textContent = pendingRegPhoneData.phone;
-        showAlert('success', 'Código SMS enviado.');
-        clearOTP('regOtpGroup');
-        document.querySelector('#regOtpGroup .otp-digit').focus();
-    } catch (err) {
-        debugError('Register phone SMS error', err);
-        showAlert('error', 'Error SMS: ' + translateFirebaseError(err.code));
-        recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
-    }
-    setButtonLoading('btnRegisterPhone', false);
-}
+            console.log('🔍 [ONBOARDING] Verificando perfil en "usuarios" | UID:', user.uid, '| Provider:', provider);
 
-async function verifyRegisterOTP() {
-    var code = getOTPValue('regOtpGroup');
-    if (code.length !== 6) { showAlert('error', 'Código de 6 dígitos requerido.'); return; }
-    setButtonLoading('btnVerifyRegister', true);
-
-    try {
-        var result = await confirmationResultRegister.confirm(code);
-        var phoneUser = result.user;
-        debugLog('✅ OTP registro OK. UID: ' + phoneUser.uid);
-
-        // Link email+password
-        var emailForLink = pendingRegPhoneData.email || pendingRegPhoneData.phone.replace('+', '') + '@dontrading.app';
-        if (pendingRegPhoneData.password) {
             try {
-                var cred = firebase.auth.EmailAuthProvider.credential(emailForLink, pendingRegPhoneData.password);
-                await phoneUser.linkWithCredential(cred);
-                debugLog('✅ Email linked');
-            } catch (e) { debugError('Link email (no bloquea)', e); }
+                var docRef = db.collection('usuarios').doc(user.uid);
+                var docSnap = await docRef.get();
+
+                if (docSnap.exists && docSnap.data().username) {
+                    // ── ✅ Perfil completo → Dashboard ──
+                    console.log('✅ [ONBOARDING] Perfil encontrado. Username:', docSnap.data().username);
+                    showAlert('success', '¡Bienvenido de vuelta, ' + (docSnap.data().displayUsername || docSnap.data().username) + '!');
+                    setTimeout(function() { window.location.href = 'dashboard.html'; }, delay);
+
+                } else if (provider === 'google') {
+                    // ── 🔵 Google nuevo → Crear perfil automático → Dashboard ──
+                    console.log('🔵 [ONBOARDING] Google: creando perfil automático...');
+
+                    var autoUsername = (user.displayName || 'trader')
+                        .toLowerCase()
+                        .replace(/\s+/g, '_')
+                        .replace(/[^a-z0-9_]/g, '')
+                        .substring(0, 20);
+
+                    // Verificar duplicado de username
+                    var usernameCheck = await db.collection('usuarios')
+                        .where('username', '==', autoUsername)
+                        .limit(1).get();
+
+                    if (!usernameCheck.empty) {
+                        autoUsername = autoUsername.substring(0, 14) + '_' + Math.floor(Math.random() * 99999);
+                    }
+
+                    var profileData = {
+                        uid:            user.uid,
+                        username:       autoUsername,
+                        displayUsername: user.displayName || autoUsername,
+                        email:          user.email || '',
+                        phone:          user.phoneNumber || '',
+                        avatarUrl:      user.photoURL || '🐂',
+                        tipoRegistro:   'google',
+                        fechaCreacion:  firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    await docRef.set(profileData);
+                    console.log('✅ [ONBOARDING] Perfil Google creado automáticamente:', profileData);
+
+                    showAlert('success', '¡Bienvenido a DonTrading! Redirigiendo...');
+                    setTimeout(function() { window.location.href = 'dashboard.html'; }, delay);
+
+                } else {
+                    // ── 📝 Email/Phone nuevo → Completar perfil ──
+                    console.log('📝 [ONBOARDING] Sin perfil completo. Redirigiendo a completar-perfil.html...');
+                    showAlert('info', 'Completa tu perfil para continuar...');
+                    setTimeout(function() { window.location.href = 'completar-perfil.html'; }, delay);
+                }
+
+            } catch (err) {
+                console.error('❌ [ONBOARDING] Error al verificar perfil:', err);
+                // Fallback: si falla Firestore, mandar a completar perfil para no perder al usuario
+                console.warn('⚠️ [ONBOARDING] Fallback → completar-perfil.html');
+                setTimeout(function() { window.location.href = 'completar-perfil.html'; }, delay);
+            }
         }
 
-        try { await phoneUser.updateProfile({ displayName: pendingRegPhoneData.name }); } catch(e) { /* silent */ }
+        /**
+         * Detecta el provider del usuario autenticado.
+         * @returns {string} 'google' | 'email' | 'phone'
+         */
+        function detectProvider(user) {
+            if (!user || !user.providerData) return 'email';
+            var providers = user.providerData.map(function(p) { return p.providerId; });
+            if (providers.indexOf('google.com') !== -1) return 'google';
+            if (providers.indexOf('phone') !== -1) return 'phone';
+            return 'email';
+        }
 
-        await saveUserToFirestore(phoneUser, {
-            name: pendingRegPhoneData.name, phone: pendingRegPhoneData.phone,
-            email: emailForLink, provider: 'phone'
+        // ═════════════════════════════════════════════════════════════════════════════
+        // FIRESTORE HELPER
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function saveUserToFirestore(user, extraData) {
+            extraData = extraData || {};
+            try {
+                var docRef = db.collection('users').doc(user.uid);
+                var doc = await docRef.get();
+
+                if (!doc.exists) {
+                    await docRef.set({
+                        name:      extraData.name || user.displayName || '',
+                        email:     extraData.email || user.email || '',
+                        phone:     extraData.phone || user.phoneNumber || '',
+                        uid:       user.uid,
+                        photoURL:  user.photoURL || '',
+                        provider:  extraData.provider || 'unknown',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        plan:      'free',
+                        verified:  false  // ← CAMBIO: empieza como false hasta verificar email
+                    });
+                    debugLog('✅ Nuevo usuario en Firestore (verified: false)');
+                } else {
+                    var update = { lastLogin: firebase.firestore.FieldValue.serverTimestamp() };
+                    var existing = doc.data();
+                    if (!existing.email && (extraData.email || user.email)) update.email = extraData.email || user.email;
+                    if (!existing.phone && (extraData.phone || user.phoneNumber)) update.phone = extraData.phone || user.phoneNumber;
+                    if (!existing.name && (extraData.name || user.displayName)) update.name = extraData.name || user.displayName;
+                    if (!existing.photoURL && user.photoURL) update.photoURL = user.photoURL;
+                    await docRef.update(update);
+                    debugLog('✅ Usuario actualizado en Firestore');
+                }
+            } catch (err) {
+                debugError('Firestore save (no bloquea redirect)', err);
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // UTILITIES
+        // ═════════════════════════════════════════════════════════════════════════════
+        function cleanPhoneNumber(phone) {
+            var digits = phone.replace(/\D/g, '');
+            if (digits.length > 10) return '+' + digits;
+            return '+1' + digits;
+        }
+        function formatPhoneInput(input) {
+            var d = input.value.replace(/\D/g, '');
+            if (d.length >= 7) input.value = '(' + d.substring(0,3) + ') ' + d.substring(3,6) + '-' + d.substring(6,10);
+            else if (d.length >= 4) input.value = '(' + d.substring(0,3) + ') ' + d.substring(3);
+            else if (d.length > 0) input.value = '(' + d;
+        }
+        ['loginPhone','regPhone','regEmailPhone'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('input', function() { formatPhoneInput(el); });
+        });
+        function togglePassword(inputId, btn) {
+            var input = document.getElementById(inputId);
+            var isPass = input.type === 'password';
+            input.type = isPass ? 'text' : 'password';
+            btn.innerHTML = isPass
+                ? '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22"/></svg>'
+                : '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+        }
+        function setButtonLoading(btnId, loading) {
+            var btn = document.getElementById(btnId);
+            if (!btn) return;
+            if (loading) {
+                btn.disabled = true;
+                btn.setAttribute('data-original-text', btn.textContent);
+                btn.innerHTML = '<span class="btn-spinner"></span>Procesando...';
+            } else {
+                btn.disabled = false;
+                btn.textContent = btn.getAttribute('data-original-text') || 'Enviar';
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // OTP
+        // ═════════════════════════════════════════════════════════════════════════════
+        function setupOTPInputs(groupId) {
+            var inputs = document.querySelectorAll('#' + groupId + ' .otp-digit');
+            inputs.forEach(function(input, i) {
+                input.addEventListener('input', function(e) {
+                    var v = e.target.value.replace(/\D/g, '');
+                    e.target.value = v.charAt(0) || '';
+                    if (v && i < inputs.length - 1) inputs[i + 1].focus();
+                });
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Backspace' && !e.target.value && i > 0) inputs[i - 1].focus();
+                });
+                input.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    var pd = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+                    for (var j = 0; j < inputs.length && j < pd.length; j++) inputs[j].value = pd.charAt(j);
+                    inputs[Math.min(pd.length, inputs.length - 1)].focus();
+                });
+            });
+        }
+        function getOTPValue(groupId) {
+            var c = ''; document.querySelectorAll('#' + groupId + ' .otp-digit').forEach(function(i) { c += i.value; }); return c;
+        }
+        function clearOTP(groupId) {
+            document.querySelectorAll('#' + groupId + ' .otp-digit').forEach(function(i) { i.value = ''; });
+        }
+        setupOTPInputs('loginOtpGroup');
+        setupOTPInputs('regOtpGroup');
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // RECAPTCHA
+        // ═════════════════════════════════════════════════════════════════════════════
+        function setupRecaptchaInvisible(buttonId) {
+            return new firebase.auth.RecaptchaVerifier(buttonId, {
+                'size': 'invisible',
+                'callback': function() { debugLog('reCAPTCHA OK: ' + buttonId); },
+                'expired-callback': function() { debugLog('reCAPTCHA expired'); }
+            });
+        }
+        function safeResetRecaptcha(v) {
+            try { if (v) v.clear(); } catch(e) { /* silent */ }
+            return null;
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  WIDGET DE VERIFICACIÓN DE EMAIL — NUEVO
+        // ═════════════════════════════════════════════════════════════════════════════
+
+        /**
+         * Inyecta el widget HTML si no existe aún en el DOM.
+         * Se llama una sola vez; las siguientes llamadas solo muestran/ocultan.
+         */
+        function ensureVerificationWidgetExists() {
+            if (document.getElementById('emailVerificationWidget')) return;
+
+            var widget = document.createElement('div');
+            widget.id = 'emailVerificationWidget';
+            widget.innerHTML = ''
+                + '<div class="evw-overlay" id="evwOverlay"></div>'
+                + '<div class="evw-card">'
+                +   '<div class="evw-icon">📧</div>'
+                +   '<h2 class="evw-title">Verifica tu correo electrónico</h2>'
+                +   '<p class="evw-text">Hemos enviado un enlace de verificación a:</p>'
+                +   '<p class="evw-email" id="evwEmail">—</p>'
+                +   '<p class="evw-text evw-sub">Revisa tu bandeja de entrada y carpeta de spam. Haz clic en el enlace del correo y luego regresa aquí.</p>'
+                +   '<button class="evw-btn evw-btn-primary" id="btnCheckVerified" onclick="checkEmailVerified()">'
+                +     '✅ Ya verifiqué mi correo'
+                +   '</button>'
+                +   '<button class="evw-btn evw-btn-secondary" id="btnResendVerification" onclick="resendVerificationEmail()">'
+                +     '🔄 Reenviar correo de verificación'
+                +   '</button>'
+                +   '<p class="evw-status" id="evwStatus"></p>'
+                +   '<a href="#" class="evw-link" onclick="cancelVerificationAndLogout(); return false;">← Volver al inicio de sesión</a>'
+                + '</div>';
+
+            // ── Estilos del widget ──
+            var style = document.createElement('style');
+            style.textContent = ''
+                + '#emailVerificationWidget { display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; }'
+                + '#emailVerificationWidget.active { display:flex; align-items:center; justify-content:center; }'
+                + '.evw-overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); }'
+                + '.evw-card { position:relative; z-index:1; background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%); border:1px solid rgba(212,175,55,0.3); border-radius:20px; padding:40px 36px; max-width:440px; width:90%; text-align:center; box-shadow:0 25px 60px rgba(0,0,0,0.5),0 0 40px rgba(212,175,55,0.1); animation:evwSlideIn 0.4s ease-out; }'
+                + '@keyframes evwSlideIn { from{opacity:0;transform:translateY(-30px)scale(0.95)} to{opacity:1;transform:translateY(0)scale(1)} }'
+                + '.evw-icon { font-size:56px; margin-bottom:16px; animation:evwBounce 2s infinite; }'
+                + '@keyframes evwBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }'
+                + '.evw-title { color:#d4af37; font-size:22px; font-weight:700; margin:0 0 12px; font-family:"Segoe UI",sans-serif; }'
+                + '.evw-text { color:rgba(255,255,255,0.8); font-size:14px; margin:0 0 6px; line-height:1.5; }'
+                + '.evw-sub { font-size:13px; color:rgba(255,255,255,0.5); margin-bottom:24px; }'
+                + '.evw-email { color:#ffd700; font-size:16px; font-weight:600; margin:8px 0 12px; word-break:break-all; }'
+                + '.evw-btn { display:block; width:100%; padding:14px; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; margin-bottom:12px; transition:all 0.2s; }'
+                + '.evw-btn:hover { transform:translateY(-2px); }'
+                + '.evw-btn:active { transform:translateY(0); }'
+                + '.evw-btn:disabled { opacity:0.6; cursor:not-allowed; transform:none; }'
+                + '.evw-btn-primary { background:linear-gradient(135deg,#d4af37,#f5d060); color:#1a1a2e; box-shadow:0 4px 15px rgba(212,175,55,0.3); }'
+                + '.evw-btn-primary:hover { box-shadow:0 6px 20px rgba(212,175,55,0.5); }'
+                + '.evw-btn-secondary { background:transparent; border:1px solid rgba(212,175,55,0.3); color:#d4af37; }'
+                + '.evw-btn-secondary:hover { background:rgba(212,175,55,0.1); }'
+                + '.evw-status { min-height:20px; font-size:13px; margin:8px 0 4px; transition:all 0.3s; }'
+                + '.evw-status.success { color:#4ade80; }'
+                + '.evw-status.error { color:#f87171; }'
+                + '.evw-status.info { color:#60a5fa; }'
+                + '.evw-link { color:rgba(255,255,255,0.5); font-size:13px; text-decoration:none; transition:color 0.2s; }'
+                + '.evw-link:hover { color:rgba(255,255,255,0.8); }'
+                + '.evw-spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(26,26,46,0.3); border-top-color:#1a1a2e; border-radius:50%; animation:evwSpin 0.6s linear infinite; vertical-align:middle; margin-right:8px; }'
+                + '@keyframes evwSpin { to{transform:rotate(360deg)} }';
+
+            document.head.appendChild(style);
+            document.body.appendChild(widget);
+        }
+
+        /**
+         * Muestra el widget de verificación con el email del usuario.
+         */
+        function showEmailVerificationWidget(email) {
+            ensureVerificationWidgetExists();
+            document.getElementById('evwEmail').textContent = email;
+            document.getElementById('evwStatus').textContent = '';
+            document.getElementById('evwStatus').className = 'evw-status';
+            document.getElementById('emailVerificationWidget').classList.add('active');
+            isWaitingEmailVerification = true;
+            console.log('📧 [VERIFICATION WIDGET] Mostrado para: ' + email);
+        }
+
+        function hideEmailVerificationWidget() {
+            var w = document.getElementById('emailVerificationWidget');
+            if (w) w.classList.remove('active');
+            isWaitingEmailVerification = false;
+        }
+
+        /**
+         * Botón "Ya verifiqué mi correo"
+         * Recarga el estado del usuario desde Firebase y verifica emailVerified.
+         */
+        async function checkEmailVerified() {
+            var btn = document.getElementById('btnCheckVerified');
+            var status = document.getElementById('evwStatus');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="evw-spinner"></span>Verificando...';
+            status.textContent = '';
+            status.className = 'evw-status';
+
+            console.log('📧 [VERIFICATION] Recargando estado del usuario...');
+
+            try {
+                var user = auth.currentUser;
+
+                if (!user) {
+                    console.error('❌ [VERIFICATION] No hay usuario autenticado');
+                    status.textContent = 'Error: sesión no encontrada. Vuelve a registrarte.';
+                    status.className = 'evw-status error';
+                    btn.disabled = false;
+                    btn.textContent = '✅ Ya verifiqué mi correo';
+                    return;
+                }
+
+                console.log('📧 [VERIFICATION] UID: ' + user.uid + ' | emailVerified antes de reload: ' + user.emailVerified);
+
+                // ── Recargar datos del usuario desde Firebase Auth ──
+                await user.reload();
+
+                // ── Re-obtener el usuario (reload() actualiza el objeto en memoria) ──
+                user = auth.currentUser;
+
+                console.log('📧 [VERIFICATION] emailVerified después de reload: ' + user.emailVerified);
+
+                if (user.emailVerified) {
+                    console.log('✅ [VERIFICATION] ¡Email verificado exitosamente!');
+                    status.textContent = '¡Correo verificado! Redirigiendo al dashboard...';
+                    status.className = 'evw-status success';
+
+                    // ── Actualizar Firestore: verified = true ──
+                    try {
+                        await db.collection('users').doc(user.uid).update({ verified: true });
+                        console.log('✅ [VERIFICATION] Firestore actualizado: verified = true');
+                    } catch (fsErr) {
+                        console.warn('⚠️ [VERIFICATION] No se pudo actualizar Firestore (no bloquea):', fsErr);
+                    }
+
+                    // ── Redirigir (verificar perfil onboarding) ──
+                    isWaitingEmailVerification = false;
+                    await checkProfileAndRedirect(user, 'email', 1500);
+
+                } else {
+                    console.warn('⚠️ [VERIFICATION] Email aún NO verificado');
+                    status.textContent = 'Tu correo aún no ha sido verificado. Revisa tu bandeja y haz clic en el enlace.';
+                    status.className = 'evw-status error';
+                    btn.disabled = false;
+                    btn.textContent = '✅ Ya verifiqué mi correo';
+                }
+
+            } catch (err) {
+                console.error('❌ [VERIFICATION] Error al verificar:', err);
+                status.textContent = 'Error al verificar: ' + (err.message || err);
+                status.className = 'evw-status error';
+                btn.disabled = false;
+                btn.textContent = '✅ Ya verifiqué mi correo';
+            }
+        }
+
+        /**
+         * Botón "Reenviar correo de verificación"
+         */
+        async function resendVerificationEmail() {
+            var btn = document.getElementById('btnResendVerification');
+            var status = document.getElementById('evwStatus');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="evw-spinner"></span>Enviando...';
+            status.textContent = '';
+            status.className = 'evw-status';
+
+            console.log('📧 [RESEND] Intentando reenviar correo de verificación...');
+
+            try {
+                var user = auth.currentUser;
+
+                if (!user) {
+                    console.error('❌ [RESEND] No hay usuario autenticado');
+                    status.textContent = 'Error: sesión no encontrada.';
+                    status.className = 'evw-status error';
+                    btn.disabled = false;
+                    btn.textContent = '🔄 Reenviar correo de verificación';
+                    return;
+                }
+
+                console.log('📧 [RESEND] Enviando a: ' + user.email);
+
+                await user.sendEmailVerification({
+                    url: window.location.origin + '/login.html',
+                    handleCodeInApp: false
+                });
+
+                console.log('✅ [RESEND] Correo de verificación reenviado exitosamente a: ' + user.email);
+                status.textContent = '¡Correo reenviado! Revisa tu bandeja de entrada y spam.';
+                status.className = 'evw-status success';
+
+                // Cooldown de 30 segundos para evitar spam
+                var countdown = 30;
+                btn.textContent = 'Reenviar en ' + countdown + 's';
+                var interval = setInterval(function() {
+                    countdown--;
+                    if (countdown <= 0) {
+                        clearInterval(interval);
+                        btn.disabled = false;
+                        btn.textContent = '🔄 Reenviar correo de verificación';
+                    } else {
+                        btn.textContent = 'Reenviar en ' + countdown + 's';
+                    }
+                }, 1000);
+
+            } catch (err) {
+                console.error('❌ [RESEND] Error al reenviar:', err);
+
+                if (err.code === 'auth/too-many-requests') {
+                    status.textContent = 'Demasiados intentos. Espera unos minutos.';
+                } else {
+                    status.textContent = 'Error al reenviar: ' + (err.message || err);
+                }
+                status.className = 'evw-status error';
+                btn.disabled = false;
+                btn.textContent = '🔄 Reenviar correo de verificación';
+            }
+        }
+
+        /**
+         * "Volver al inicio de sesión" — cierra sesión y oculta widget
+         */
+        async function cancelVerificationAndLogout() {
+            console.log('📧 [VERIFICATION] Usuario canceló. Cerrando sesión...');
+            isWaitingEmailVerification = false;
+            hideEmailVerificationWidget();
+            try {
+                await auth.signOut();
+                console.log('✅ [VERIFICATION] Sesión cerrada.');
+            } catch (e) {
+                console.warn('⚠️ [VERIFICATION] Error al cerrar sesión:', e);
+            }
+            showView('login');
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  GOOGLE SIGN-IN — Popup con fallback a Redirect
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleGoogleSignIn() {
+            hideAlert();
+            var btn = document.getElementById('btnGoogleLogin');
+            if (btn) { btn.disabled = true; btn.textContent = 'Conectando...'; }
+
+            debugLog('Iniciando Google Sign-In (popup)...');
+
+            try {
+                var result = await auth.signInWithPopup(googleProvider);
+                var user = result.user;
+                debugLog('✅ Google popup exitoso! UID: ' + user.uid + ', email: ' + user.email);
+
+                await saveUserToFirestore(user, { provider: 'google' });
+                showAlert('success', '¡Bienvenido! Verificando perfil...');
+                await checkProfileAndRedirect(user, 'google', 1200);
+
+            } catch (err) {
+                debugError('Google popup error', err);
+
+                if (err.code === 'auth/popup-blocked' ||
+                    err.code === 'auth/popup-closed-by-user' ||
+                    err.code === 'auth/cancelled-popup-request') {
+
+                    debugLog('Popup bloqueado/cerrado, intentando redirect...');
+                    showAlert('info', 'Redirigiendo a Google para autenticación...');
+
+                    try {
+                        await auth.signInWithRedirect(googleProvider);
+                    } catch (redirectErr) {
+                        debugError('Google redirect error', redirectErr);
+                        showAlert('error', 'Error al redirigir a Google: ' + redirectErr.message);
+                    }
+
+                } else if (err.code === 'auth/account-exists-with-different-credential') {
+                    showAlert('error', 'Ya existe una cuenta con ese email usando otro método. Intenta con email/contraseña o teléfono.');
+
+                } else if (err.code === 'auth/unauthorized-domain') {
+                    showAlert('error', 'Este dominio no está autorizado en Firebase. Agrega "' + window.location.hostname + '" en Firebase Console → Authentication → Settings → Authorized domains.');
+                    debugError('UNAUTHORIZED DOMAIN', { hostname: window.location.hostname, origin: window.location.origin });
+
+                } else if (err.code === 'auth/internal-error') {
+                    showAlert('error', 'Error interno de Firebase. Verifica que el OAuth consent screen esté configurado en Google Cloud Console.');
+
+                } else if (err.code === 'auth/operation-not-allowed') {
+                    showAlert('error', 'Google Sign-In no está habilitado. Actívalo en Firebase Console → Authentication → Sign-in method → Google.');
+
+                } else {
+                    showAlert('error', 'Error con Google: ' + translateFirebaseError(err.code));
+                }
+            }
+
+            if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continuar con Google'; }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  LOGIN: EMAIL + PASSWORD
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleLoginEmail() {
+            hideAlert();
+            var email = document.getElementById('loginEmail').value.trim();
+            var password = document.getElementById('loginEmailPassword').value;
+
+            if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
+            if (!password) { showAlert('error', 'Ingresa tu contraseña.'); return; }
+
+            setButtonLoading('btnLoginEmail', true);
+            debugLog('Login email: ' + email);
+
+            try {
+                var result = await auth.signInWithEmailAndPassword(email, password);
+                var user = result.user;
+                debugLog('✅ Login email OK. UID: ' + user.uid + ' | emailVerified: ' + user.emailVerified);
+
+                // ── NUEVO: Verificar si el email está confirmado ──
+                if (!user.emailVerified) {
+                    console.warn('⚠️ [LOGIN] Email no verificado. Mostrando widget...');
+                    isRedirecting = true; // Bloquea onAuthStateChanged
+                    await saveUserToFirestore(user, { provider: 'email' });
+                    showEmailVerificationWidget(user.email);
+                    setButtonLoading('btnLoginEmail', false);
+                    return;
+                }
+
+                await saveUserToFirestore(user, { provider: 'email' });
+                showAlert('success', '¡Bienvenido de vuelta! Verificando perfil...');
+                await checkProfileAndRedirect(user, 'email', 1200);
+
+            } catch (err) {
+                debugError('Login email error', err);
+                if (err.code === 'auth/user-not-found') {
+                    showAlert('error', 'No hay cuenta con ese email. ¿Quieres registrarte?');
+                } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                    showAlert('error', 'Contraseña incorrecta.');
+                } else {
+                    showAlert('error', translateFirebaseError(err.code));
+                }
+            }
+            setButtonLoading('btnLoginEmail', false);
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  LOGIN: PHONE
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleLoginPhone() {
+            hideAlert();
+            var phone = document.getElementById('loginPhone').value.trim();
+            var password = document.getElementById('loginPhonePassword').value;
+
+            if (!phone) { showAlert('error', 'Ingresa tu número de teléfono.'); return; }
+            if (phone.replace(/\D/g, '').length < 10) { showAlert('error', 'El número debe tener al menos 10 dígitos.'); return; }
+            if (!password) { showAlert('error', 'Ingresa tu contraseña.'); return; }
+
+            setButtonLoading('btnLoginPhone', true);
+            var fullPhone = cleanPhoneNumber(phone);
+            debugLog('Login phone: ' + fullPhone);
+
+            try {
+                var snapshot = await db.collection('users').where('phone', '==', fullPhone).limit(1).get();
+
+                if (snapshot.empty) {
+                    showAlert('error', 'No se encontró cuenta con ese número. ¿Quieres registrarte?');
+                    setButtonLoading('btnLoginPhone', false);
+                    return;
+                }
+
+                var userData = snapshot.docs[0].data();
+                debugLog('Usuario encontrado, email: ' + (userData.email || 'N/A'));
+
+                if (userData.email) {
+                    try {
+                        var result = await auth.signInWithEmailAndPassword(userData.email, password);
+                        debugLog('✅ Login phone→email OK');
+                        showAlert('success', '¡Bienvenido de vuelta! Verificando perfil...');
+                        await checkProfileAndRedirect(result.user, 'phone', 1200);
+                    } catch (emailErr) {
+                        debugError('Login phone→email error', emailErr);
+                        if (emailErr.code === 'auth/wrong-password' || emailErr.code === 'auth/invalid-credential') {
+                            showAlert('error', 'Contraseña incorrecta.');
+                        } else {
+                            showAlert('error', translateFirebaseError(emailErr.code));
+                        }
+                    }
+                } else {
+                    showAlert('info', 'Verificación por SMS necesaria...');
+                    await sendLoginOTP(fullPhone);
+                }
+            } catch (err) {
+                debugError('Login phone error', err);
+                showAlert('error', 'Error: ' + (err.message || err));
+            }
+            setButtonLoading('btnLoginPhone', false);
+        }
+
+        async function sendLoginOTP(phoneNumber) {
+            try {
+                recaptchaVerifierLogin = safeResetRecaptcha(recaptchaVerifierLogin);
+                recaptchaVerifierLogin = setupRecaptchaInvisible('btnLoginPhone');
+                confirmationResultLogin = await auth.signInWithPhoneNumber(phoneNumber, recaptchaVerifierLogin);
+                document.getElementById('loginPhoneVerify').classList.add('active');
+                document.getElementById('btnLoginPhone').style.display = 'none';
+                document.getElementById('loginVerifyPhone').textContent = phoneNumber;
+                showAlert('success', 'Código SMS enviado.');
+                clearOTP('loginOtpGroup');
+                document.querySelector('#loginOtpGroup .otp-digit').focus();
+            } catch (err) {
+                debugError('SMS login error', err);
+                showAlert('error', 'Error SMS: ' + translateFirebaseError(err.code));
+                recaptchaVerifierLogin = safeResetRecaptcha(recaptchaVerifierLogin);
+            }
+        }
+
+        async function verifyLoginOTP() {
+            var code = getOTPValue('loginOtpGroup');
+            if (code.length !== 6) { showAlert('error', 'Código de 6 dígitos requerido.'); return; }
+            setButtonLoading('btnVerifyLogin', true);
+            try {
+                var result = await confirmationResultLogin.confirm(code);
+                debugLog('✅ Login OTP OK');
+                await saveUserToFirestore(result.user, { provider: 'phone' });
+                showAlert('success', '¡Verificado! Redirigiendo...');
+                await checkProfileAndRedirect(result.user, 'phone', 1200);
+            } catch (err) {
+                showAlert('error', 'Código incorrecto.');
+                clearOTP('loginOtpGroup');
+            }
+            setButtonLoading('btnVerifyLogin', false);
+        }
+
+        function resendLoginCode() {
+            sendLoginOTP(cleanPhoneNumber(document.getElementById('loginPhone').value.trim()));
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  REGISTER: EMAIL — CON VERIFICACIÓN OBLIGATORIA
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleRegisterEmail() {
+            hideAlert();
+            var name     = document.getElementById('regEmailName').value.trim();
+            var email    = document.getElementById('regEmail').value.trim();
+            var password = document.getElementById('regEmailPassword').value;
+            var phone    = document.getElementById('regEmailPhone').value.trim();
+
+            if (!name) { showAlert('error', 'Ingresa tu nombre.'); return; }
+            if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
+            if (!password) { showAlert('error', 'Ingresa una contraseña.'); return; }
+            if (password.length < 6) { showAlert('error', 'Mínimo 6 caracteres.'); return; }
+
+            setButtonLoading('btnRegisterEmail', true);
+            debugLog('Register email: ' + email);
+
+            // ═══════════════════════════════════════════════════════════════════
+            // ✅ CRITICAL FIX: Bloquear auto-redirect ANTES de crear usuario
+            // Sin esto, onAuthStateChanged redirige al dashboard instantáneamente
+            // y sendEmailVerification nunca se ejecuta.
+            // ═══════════════════════════════════════════════════════════════════
+            isRedirecting = true;
+
+            try {
+                // ── Paso 1: Crear usuario ──
+                var result = await auth.createUserWithEmailAndPassword(email, password);
+                var user = result.user;
+                console.log('✅ [REGISTER] Cuenta creada. UID: ' + user.uid);
+                console.log('✅ [REGISTER] emailVerified: ' + user.emailVerified);
+
+                // ── Paso 2: Actualizar displayName ──
+                try {
+                    await user.updateProfile({ displayName: name });
+                    console.log('✅ [REGISTER] displayName actualizado: ' + name);
+                } catch(e) {
+                    console.warn('⚠️ [REGISTER] Error al actualizar displayName:', e);
+                }
+
+                // ── Paso 3: Enviar email de verificación ──
+                var emailSent = false;
+                try {
+                    console.log('📧 [REGISTER] Enviando email de verificación a: ' + email + '...');
+                    await user.sendEmailVerification({
+                        url: window.location.origin + '/login.html',
+                        handleCodeInApp: false
+                    });
+                    emailSent = true;
+                    console.log('✅ [REGISTER] ¡Email de verificación enviado exitosamente a: ' + email + '!');
+                } catch (verifyErr) {
+                    console.error('❌ [REGISTER] ERROR al enviar email de verificación:', verifyErr);
+                    console.error('❌ [REGISTER] Error code:', verifyErr.code || 'N/A');
+                    console.error('❌ [REGISTER] Error message:', verifyErr.message || 'N/A');
+                    debugError('sendEmailVerification FALLÓ', verifyErr);
+                }
+
+                // ── Paso 4: Guardar en Firestore ──
+                await saveUserToFirestore(user, {
+                    name: name, email: email,
+                    phone: phone ? cleanPhoneNumber(phone) : '',
+                    provider: 'email'
+                });
+
+                // ── Paso 5: Mostrar widget de verificación (NO redirigir) ──
+                if (emailSent) {
+                    console.log('📧 [REGISTER] Mostrando widget de verificación...');
+                    showEmailVerificationWidget(email);
+                } else {
+                    // Si no se pudo enviar, intenta una vez más
+                    console.warn('⚠️ [REGISTER] Reintentando envío de email...');
+                    try {
+                        await user.sendEmailVerification({
+                            url: window.location.origin + '/login.html',
+                            handleCodeInApp: false
+                        });
+                        console.log('✅ [REGISTER] Email enviado en segundo intento');
+                        showEmailVerificationWidget(email);
+                    } catch (retryErr) {
+                        console.error('❌ [REGISTER] Segundo intento también falló:', retryErr);
+                        showAlert('error', 'No pudimos enviar el correo de verificación. Intenta iniciar sesión y reenviar.');
+                        isRedirecting = false; // Desbloquear
+                    }
+                }
+
+            } catch (err) {
+                // ── Si falla la creación de cuenta, desbloquear auto-redirect ──
+                isRedirecting = false;
+                debugError('Register email error', err);
+
+                if (err.code === 'auth/email-already-in-use') {
+                    showAlert('error', 'Ya existe cuenta con ese email. ¿Quieres iniciar sesión?');
+                } else if (err.code === 'auth/weak-password') {
+                    showAlert('error', 'Contraseña muy débil. Usa al menos 6 caracteres.');
+                } else {
+                    showAlert('error', translateFirebaseError(err.code));
+                }
+            }
+            setButtonLoading('btnRegisterEmail', false);
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  REGISTER: PHONE + OTP
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleRegisterPhone() {
+            hideAlert();
+            var name     = document.getElementById('regPhoneName').value.trim();
+            var phone    = document.getElementById('regPhone').value.trim();
+            var password = document.getElementById('regPhonePassword').value;
+            var email    = document.getElementById('regPhoneEmail').value.trim();
+
+            if (!name) { showAlert('error', 'Ingresa tu nombre.'); return; }
+            if (!phone || phone.replace(/\D/g, '').length < 10) { showAlert('error', 'Teléfono válido requerido.'); return; }
+            if (!password) { showAlert('error', 'Ingresa una contraseña.'); return; }
+            if (password.length < 6) { showAlert('error', 'Mínimo 6 caracteres.'); return; }
+
+            pendingRegPhoneData = { name: name, phone: cleanPhoneNumber(phone), password: password, email: email };
+            setButtonLoading('btnRegisterPhone', true);
+            debugLog('Register phone: ' + pendingRegPhoneData.phone);
+
+            try {
+                recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
+                recaptchaVerifierRegister = setupRecaptchaInvisible('btnRegisterPhone');
+                confirmationResultRegister = await auth.signInWithPhoneNumber(pendingRegPhoneData.phone, recaptchaVerifierRegister);
+                document.getElementById('registerPhoneVerify').classList.add('active');
+                document.getElementById('btnRegisterPhone').style.display = 'none';
+                document.getElementById('regVerifyPhone').textContent = pendingRegPhoneData.phone;
+                showAlert('success', 'Código SMS enviado.');
+                clearOTP('regOtpGroup');
+                document.querySelector('#regOtpGroup .otp-digit').focus();
+            } catch (err) {
+                debugError('Register phone SMS error', err);
+                showAlert('error', 'Error SMS: ' + translateFirebaseError(err.code));
+                recaptchaVerifierRegister = safeResetRecaptcha(recaptchaVerifierRegister);
+            }
+            setButtonLoading('btnRegisterPhone', false);
+        }
+
+        async function verifyRegisterOTP() {
+            var code = getOTPValue('regOtpGroup');
+            if (code.length !== 6) { showAlert('error', 'Código de 6 dígitos requerido.'); return; }
+            setButtonLoading('btnVerifyRegister', true);
+
+            try {
+                var result = await confirmationResultRegister.confirm(code);
+                var phoneUser = result.user;
+                debugLog('✅ OTP registro OK. UID: ' + phoneUser.uid);
+
+                var emailForLink = pendingRegPhoneData.email || pendingRegPhoneData.phone.replace('+', '') + '@dontrading.app';
+                if (pendingRegPhoneData.password) {
+                    try {
+                        var cred = firebase.auth.EmailAuthProvider.credential(emailForLink, pendingRegPhoneData.password);
+                        await phoneUser.linkWithCredential(cred);
+                        debugLog('✅ Email linked');
+                    } catch (e) { debugError('Link email (no bloquea)', e); }
+                }
+
+                try { await phoneUser.updateProfile({ displayName: pendingRegPhoneData.name }); } catch(e) { /* silent */ }
+
+                await saveUserToFirestore(phoneUser, {
+                    name: pendingRegPhoneData.name, phone: pendingRegPhoneData.phone,
+                    email: emailForLink, provider: 'phone'
+                });
+
+                showAlert('success', '¡Cuenta creada! Completando perfil...');
+                await checkProfileAndRedirect(phoneUser, 'phone', 1500);
+
+            } catch (err) {
+                debugError('Verify register error', err);
+                if (err.code === 'auth/invalid-verification-code') {
+                    showAlert('error', 'Código incorrecto.');
+                    clearOTP('regOtpGroup');
+                } else {
+                    showAlert('error', translateFirebaseError(err.code));
+                }
+            }
+            setButtonLoading('btnVerifyRegister', false);
+        }
+
+        function resendRegisterCode() { handleRegisterPhone(); }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ██  RECOVERY
+        // ═════════════════════════════════════════════════════════════════════════════
+        async function handleRecovery() {
+            hideAlert();
+            var email = document.getElementById('recoveryEmail').value.trim();
+            if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
+
+            setButtonLoading('btnRecovery', true);
+            try {
+                await auth.sendPasswordResetEmail(email);
+                showAlert('success', '¡Enlace enviado! Revisa tu bandeja en ' + email + ' (y carpeta de spam).');
+            } catch (err) {
+                if (err.code === 'auth/user-not-found') {
+                    showAlert('error', 'No hay cuenta con ese email.');
+                } else {
+                    showAlert('error', translateFirebaseError(err.code));
+                }
+            }
+            setButtonLoading('btnRecovery', false);
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // ERROR TRANSLATION
+        // ═════════════════════════════════════════════════════════════════════════════
+        function translateFirebaseError(code) {
+            var m = {
+                'auth/invalid-phone-number':       'Número de teléfono no válido.',
+                'auth/too-many-requests':          'Demasiados intentos. Espera un momento.',
+                'auth/quota-exceeded':             'Límite de SMS excedido.',
+                'auth/invalid-verification-code':  'Código incorrecto.',
+                'auth/code-expired':               'Código expirado. Solicita otro.',
+                'auth/user-not-found':             'Cuenta no encontrada.',
+                'auth/wrong-password':             'Contraseña incorrecta.',
+                'auth/invalid-credential':         'Credenciales inválidas.',
+                'auth/email-already-in-use':       'Email ya registrado.',
+                'auth/weak-password':              'Contraseña muy débil (mín. 6 chars).',
+                'auth/network-request-failed':     'Sin conexión. Verifica tu internet.',
+                'auth/popup-closed-by-user':       'Ventana cerrada. Intenta de nuevo.',
+                'auth/popup-blocked':              'Popup bloqueado por el navegador.',
+                'auth/captcha-check-failed':       'Error reCAPTCHA.',
+                'auth/missing-phone-number':       'Teléfono requerido.',
+                'auth/credential-already-in-use':  'Credencial ya asociada a otra cuenta.',
+                'auth/billing-not-enabled':        'Plan Blaze no activo en Firebase.',
+                'auth/operation-not-allowed':      'Proveedor no habilitado en Firebase Console.',
+                'auth/unauthorized-domain':        'Dominio no autorizado en Firebase.',
+                'auth/account-exists-with-different-credential': 'Cuenta existente con otro método.',
+                'auth/internal-error':             'Error interno. Verifica OAuth consent screen en Google Cloud.'
+            };
+            return m[code] || 'Error (' + code + ')';
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════════
+        // AUTH STATE OBSERVER — ACTUALIZADO
+        // ═════════════════════════════════════════════════════════════════════════════
+        auth.onAuthStateChanged(function(user) {
+            if (user && !isRedirecting && !isWaitingEmailVerification) {
+                debugLog('👤 Auth state: ' + user.uid + ' (' + (user.email || user.phoneNumber || 'google') + ') | emailVerified: ' + user.emailVerified);
+
+                var isVerifying = document.getElementById('registerPhoneVerify').classList.contains('active')
+                            || document.getElementById('loginPhoneVerify').classList.contains('active');
+
+                if (!isVerifying) {
+                    // ── NUEVO: Si es proveedor email y no ha verificado, mostrar widget ──
+                    var isEmailProvider = user.providerData.some(function(p) { return p.providerId === 'password'; });
+                    var isGoogleProvider = user.providerData.some(function(p) { return p.providerId === 'google.com'; });
+
+                    if (isEmailProvider && !isGoogleProvider && !user.emailVerified) {
+                        console.warn('⚠️ [AUTH OBSERVER] Email no verificado. Mostrando widget en lugar de redirigir.');
+                        isRedirecting = true;
+                        showEmailVerificationWidget(user.email);
+                        return;
+                    }
+
+                    debugLog('🚀 Auto-redirect: ya autenticado y verificado. Verificando perfil...');
+                    checkProfileAndRedirect(user, detectProvider(user), 800);
+                }
+            }
         });
 
-        showAlert('success', '¡Cuenta creada! Redirigiendo...');
-        redirectToDashboard(1500);
-
-    } catch (err) {
-        debugError('Verify register error', err);
-        if (err.code === 'auth/invalid-verification-code') {
-            showAlert('error', 'Código incorrecto.');
-            clearOTP('regOtpGroup');
-        } else {
-            showAlert('error', translateFirebaseError(err.code));
-        }
-    }
-    setButtonLoading('btnVerifyRegister', false);
-}
-
-function resendRegisterCode() { handleRegisterPhone(); }
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ██  RECOVERY
-// ═════════════════════════════════════════════════════════════════════════════
-async function handleRecovery() {
-    hideAlert();
-    var email = document.getElementById('recoveryEmail').value.trim();
-    if (!email) { showAlert('error', 'Ingresa tu email.'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Email no válido.'); return; }
-
-    setButtonLoading('btnRecovery', true);
-    try {
-        await auth.sendPasswordResetEmail(email);
-        showAlert('success', '¡Enlace enviado! Revisa tu bandeja en ' + email + ' (y carpeta de spam).');
-    } catch (err) {
-        if (err.code === 'auth/user-not-found') {
-            showAlert('error', 'No hay cuenta con ese email.');
-        } else {
-            showAlert('error', translateFirebaseError(err.code));
-        }
-    }
-    setButtonLoading('btnRecovery', false);
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ERROR TRANSLATION
-// ═════════════════════════════════════════════════════════════════════════════
-function translateFirebaseError(code) {
-    var m = {
-        'auth/invalid-phone-number':       'Número de teléfono no válido.',
-        'auth/too-many-requests':          'Demasiados intentos. Espera un momento.',
-        'auth/quota-exceeded':             'Límite de SMS excedido.',
-        'auth/invalid-verification-code':  'Código incorrecto.',
-        'auth/code-expired':               'Código expirado. Solicita otro.',
-        'auth/user-not-found':             'Cuenta no encontrada.',
-        'auth/wrong-password':             'Contraseña incorrecta.',
-        'auth/invalid-credential':         'Credenciales inválidas.',
-        'auth/email-already-in-use':       'Email ya registrado.',
-        'auth/weak-password':              'Contraseña muy débil (mín. 6 chars).',
-        'auth/network-request-failed':     'Sin conexión. Verifica tu internet.',
-        'auth/popup-closed-by-user':       'Ventana cerrada. Intenta de nuevo.',
-        'auth/popup-blocked':              'Popup bloqueado por el navegador.',
-        'auth/captcha-check-failed':       'Error reCAPTCHA.',
-        'auth/missing-phone-number':       'Teléfono requerido.',
-        'auth/credential-already-in-use':  'Credencial ya asociada a otra cuenta.',
-        'auth/billing-not-enabled':        'Plan Blaze no activo en Firebase.',
-        'auth/operation-not-allowed':      'Proveedor no habilitado en Firebase Console.',
-        'auth/unauthorized-domain':        'Dominio no autorizado en Firebase.',
-        'auth/account-exists-with-different-credential': 'Cuenta existente con otro método.',
-        'auth/internal-error':             'Error interno. Verifica OAuth consent screen en Google Cloud.'
-    };
-    return m[code] || 'Error (' + code + ')';
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// AUTH STATE OBSERVER
-// ═════════════════════════════════════════════════════════════════════════════
-auth.onAuthStateChanged(function(user) {
-    if (user && !isRedirecting) {
-        debugLog('👤 Auth state: ' + user.uid + ' (' + (user.email || user.phoneNumber || 'google') + ')');
-        var isVerifying = document.getElementById('registerPhoneVerify').classList.contains('active')
-                       || document.getElementById('loginPhoneVerify').classList.contains('active');
-        if (!isVerifying) {
-            debugLog('🚀 Auto-redirect: ya autenticado');
-            window.location.href = 'dashboard.html';
-        }
-    }
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// INIT
-// ═════════════════════════════════════════════════════════════════════════════
-console.log('🔐 DONTRADING Login v2.1');
-console.log('📧 Email/Password: ✅  |  📱 Phone/SMS: ✅  |  🔵 Google: ✅');
-console.log('🌐 Domain: ' + window.location.hostname);
-console.log('🔗 Origin: ' + window.location.origin);
-console.log('🔥 authDomain: ' + firebaseConfig.authDomain);
-debugLog('Page loaded. Domain: ' + window.location.hostname);
+        // ═════════════════════════════════════════════════════════════════════════════
+        // INIT
+        // ═════════════════════════════════════════════════════════════════════════════
+        console.log('🔐 DONTRADING Login v3.0 — Onboarding + Email Verification');
+        console.log('📧 Email: ✅  |  📱 Phone: ✅  |  🔵 Google: ✅  |  📝 Onboarding: ✅');
+        console.log('🌐 Domain: ' + window.location.hostname);
+        console.log('🔗 Origin: ' + window.location.origin);
+        console.log('🔥 authDomain: ' + firebaseConfig.authDomain);
+        debugLog('Page loaded. Domain: ' + window.location.hostname);
     </script>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
 </body>
 </html>
