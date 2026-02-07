@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+    <!DOCTYPE html>
 <html lang="es">
 <head>
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -612,15 +612,13 @@
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <script>
         // ═════════════════════════════════════════════════════════════════════════════
-        // DONTRADING — AUTH MODULE v3.0 — ONBOARDING EDITION
-        // ✅ Google: popup con fallback a redirect + auto-perfil en "usuarios"
-        // ✅ Email: registro + verificación obligatoria + onboarding
-        // ✅ Phone: OTP con reCAPTCHA invisible + onboarding
+        // DONTRADING — AUTH MODULE v2.2
+        // ✅ Google: popup con fallback a redirect
+        // ✅ Email: registro + verificación obligatoria antes de entrar
+        // ✅ Phone: OTP con reCAPTCHA invisible
         // ✅ Debug: banner visual + logs detallados
         // ✅ Redirect: getRedirectResult() al cargar página
-        // ✅ Widget de verificación de email post-registro
-        // ✅ NEW: Onboarding — verifica colección "usuarios" antes de redirigir
-        // ✅ NEW: Google auto-crea perfil, Email/Phone → completar-perfil.html
+        // ✅ NEW: Widget de verificación de email post-registro
         // ═════════════════════════════════════════════════════════════════════════════
 
         // ─── FIREBASE CONFIG ─────────────────────────────────────────────────────────
@@ -693,8 +691,8 @@
                     debugLog('✅ Redirect result captured! UID: ' + result.user.uid);
                     isRedirecting = true;
                     await saveUserToFirestore(result.user, { provider: 'google' });
-                    showAlert('success', '¡Bienvenido! Verificando perfil...');
-                    await checkProfileAndRedirect(result.user, 'google', 1200);
+                    showAlert('success', '¡Bienvenido! Redirigiendo...');
+                    redirectToDashboard(1200);
                 } else {
                     debugLog('No redirect result (normal page load)');
                 }
@@ -758,99 +756,6 @@
             isRedirecting = true;
             console.log('🚀 Redirect en ' + delay + 'ms');
             setTimeout(function() { window.location.href = 'dashboard.html'; }, delay);
-        }
-
-        // ═════════════════════════════════════════════════════════════════════════════
-        // ██  ONBOARDING — Verifica perfil en colección "usuarios" antes de redirigir
-        // ═════════════════════════════════════════════════════════════════════════════
-        /**
-         * Flujo:
-         *   1) Busca doc en "usuarios/{uid}"
-         *   2) Si existe y tiene username → dashboard.html
-         *   3) Si NO existe y provider es 'google' → crea perfil auto → dashboard.html
-         *   4) Si NO existe y provider es 'email'|'phone' → completar-perfil.html
-         *
-         * Estructura "usuarios":
-         *   uid, username, displayUsername, email, phone,
-         *   avatarUrl, tipoRegistro, fechaCreacion
-         */
-        async function checkProfileAndRedirect(user, provider, delay) {
-            delay = delay || 1200;
-            isRedirecting = true;
-
-            console.log('🔍 [ONBOARDING] Verificando perfil en "usuarios" | UID:', user.uid, '| Provider:', provider);
-
-            try {
-                var docRef = db.collection('usuarios').doc(user.uid);
-                var docSnap = await docRef.get();
-
-                if (docSnap.exists && docSnap.data().username) {
-                    // ── ✅ Perfil completo → Dashboard ──
-                    console.log('✅ [ONBOARDING] Perfil encontrado. Username:', docSnap.data().username);
-                    showAlert('success', '¡Bienvenido de vuelta, ' + (docSnap.data().displayUsername || docSnap.data().username) + '!');
-                    setTimeout(function() { window.location.href = 'dashboard.html'; }, delay);
-
-                } else if (provider === 'google') {
-                    // ── 🔵 Google nuevo → Crear perfil automático → Dashboard ──
-                    console.log('🔵 [ONBOARDING] Google: creando perfil automático...');
-
-                    var autoUsername = (user.displayName || 'trader')
-                        .toLowerCase()
-                        .replace(/\s+/g, '_')
-                        .replace(/[^a-z0-9_]/g, '')
-                        .substring(0, 20);
-
-                    // Verificar duplicado de username
-                    var usernameCheck = await db.collection('usuarios')
-                        .where('username', '==', autoUsername)
-                        .limit(1).get();
-
-                    if (!usernameCheck.empty) {
-                        autoUsername = autoUsername.substring(0, 14) + '_' + Math.floor(Math.random() * 99999);
-                    }
-
-                    var profileData = {
-                        uid:            user.uid,
-                        username:       autoUsername,
-                        displayUsername: user.displayName || autoUsername,
-                        email:          user.email || '',
-                        phone:          user.phoneNumber || '',
-                        avatarUrl:      user.photoURL || '🐂',
-                        tipoRegistro:   'google',
-                        fechaCreacion:  firebase.firestore.FieldValue.serverTimestamp()
-                    };
-
-                    await docRef.set(profileData);
-                    console.log('✅ [ONBOARDING] Perfil Google creado automáticamente:', profileData);
-
-                    showAlert('success', '¡Bienvenido a DonTrading! Redirigiendo...');
-                    setTimeout(function() { window.location.href = 'dashboard.html'; }, delay);
-
-                } else {
-                    // ── 📝 Email/Phone nuevo → Completar perfil ──
-                    console.log('📝 [ONBOARDING] Sin perfil completo. Redirigiendo a completar-perfil.html...');
-                    showAlert('info', 'Completa tu perfil para continuar...');
-                    setTimeout(function() { window.location.href = 'completar-perfil.html'; }, delay);
-                }
-
-            } catch (err) {
-                console.error('❌ [ONBOARDING] Error al verificar perfil:', err);
-                // Fallback: si falla Firestore, mandar a completar perfil para no perder al usuario
-                console.warn('⚠️ [ONBOARDING] Fallback → completar-perfil.html');
-                setTimeout(function() { window.location.href = 'completar-perfil.html'; }, delay);
-            }
-        }
-
-        /**
-         * Detecta el provider del usuario autenticado.
-         * @returns {string} 'google' | 'email' | 'phone'
-         */
-        function detectProvider(user) {
-            if (!user || !user.providerData) return 'email';
-            var providers = user.providerData.map(function(p) { return p.providerId; });
-            if (providers.indexOf('google.com') !== -1) return 'google';
-            if (providers.indexOf('phone') !== -1) return 'phone';
-            return 'email';
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
@@ -1109,9 +1014,9 @@
                         console.warn('⚠️ [VERIFICATION] No se pudo actualizar Firestore (no bloquea):', fsErr);
                     }
 
-                    // ── Redirigir (verificar perfil onboarding) ──
+                    // ── Redirigir al dashboard ──
                     isWaitingEmailVerification = false;
-                    await checkProfileAndRedirect(user, 'email', 1500);
+                    redirectToDashboard(1500);
 
                 } else {
                     console.warn('⚠️ [VERIFICATION] Email aún NO verificado');
@@ -1226,8 +1131,8 @@
                 debugLog('✅ Google popup exitoso! UID: ' + user.uid + ', email: ' + user.email);
 
                 await saveUserToFirestore(user, { provider: 'google' });
-                showAlert('success', '¡Bienvenido! Verificando perfil...');
-                await checkProfileAndRedirect(user, 'google', 1200);
+                showAlert('success', '¡Bienvenido! Redirigiendo...');
+                redirectToDashboard(1200);
 
             } catch (err) {
                 debugError('Google popup error', err);
@@ -1298,8 +1203,8 @@
                 }
 
                 await saveUserToFirestore(user, { provider: 'email' });
-                showAlert('success', '¡Bienvenido de vuelta! Verificando perfil...');
-                await checkProfileAndRedirect(user, 'email', 1200);
+                showAlert('success', '¡Bienvenido de vuelta! Redirigiendo...');
+                redirectToDashboard(1200);
 
             } catch (err) {
                 debugError('Login email error', err);
@@ -1346,8 +1251,8 @@
                     try {
                         var result = await auth.signInWithEmailAndPassword(userData.email, password);
                         debugLog('✅ Login phone→email OK');
-                        showAlert('success', '¡Bienvenido de vuelta! Verificando perfil...');
-                        await checkProfileAndRedirect(result.user, 'phone', 1200);
+                        showAlert('success', '¡Bienvenido de vuelta! Redirigiendo...');
+                        redirectToDashboard(1200);
                     } catch (emailErr) {
                         debugError('Login phone→email error', emailErr);
                         if (emailErr.code === 'auth/wrong-password' || emailErr.code === 'auth/invalid-credential') {
@@ -1394,7 +1299,7 @@
                 debugLog('✅ Login OTP OK');
                 await saveUserToFirestore(result.user, { provider: 'phone' });
                 showAlert('success', '¡Verificado! Redirigiendo...');
-                await checkProfileAndRedirect(result.user, 'phone', 1200);
+                redirectToDashboard(1200);
             } catch (err) {
                 showAlert('error', 'Código incorrecto.');
                 clearOTP('loginOtpGroup');
@@ -1571,8 +1476,8 @@
                     email: emailForLink, provider: 'phone'
                 });
 
-                showAlert('success', '¡Cuenta creada! Completando perfil...');
-                await checkProfileAndRedirect(phoneUser, 'phone', 1500);
+                showAlert('success', '¡Cuenta creada! Redirigiendo...');
+                redirectToDashboard(1500);
 
             } catch (err) {
                 debugError('Verify register error', err);
@@ -1663,8 +1568,8 @@
                         return;
                     }
 
-                    debugLog('🚀 Auto-redirect: ya autenticado y verificado. Verificando perfil...');
-                    checkProfileAndRedirect(user, detectProvider(user), 800);
+                    debugLog('🚀 Auto-redirect: ya autenticado y verificado');
+                    window.location.href = 'dashboard.html';
                 }
             }
         });
@@ -1672,8 +1577,8 @@
         // ═════════════════════════════════════════════════════════════════════════════
         // INIT
         // ═════════════════════════════════════════════════════════════════════════════
-        console.log('🔐 DONTRADING Login v3.0 — Onboarding + Email Verification');
-        console.log('📧 Email: ✅  |  📱 Phone: ✅  |  🔵 Google: ✅  |  📝 Onboarding: ✅');
+        console.log('🔐 DONTRADING Login v2.2 — Email Verification Required');
+        console.log('📧 Email/Password: ✅  |  📱 Phone/SMS: ✅  |  🔵 Google: ✅');
         console.log('🌐 Domain: ' + window.location.hostname);
         console.log('🔗 Origin: ' + window.location.origin);
         console.log('🔥 authDomain: ' + firebaseConfig.authDomain);
