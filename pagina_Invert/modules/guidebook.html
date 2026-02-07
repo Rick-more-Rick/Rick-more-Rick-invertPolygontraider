@@ -501,12 +501,13 @@
         .cont3-chart-section {
             display: flex;
             flex-direction: column;
-            padding: 16px;
+            padding: 10px 12px 12px;
             overflow: hidden;
             border-right: 1px solid var(--border);
+            min-height: 0;
         }
 
-        .main-reel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0; }
+        .main-reel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0; }
         .main-reel-info { display: flex; align-items: center; gap: 16px; }
         .main-reel-symbol-block { display: flex; flex-direction: column; gap: 2px; }
         .main-reel-symbol { font-size: 24px; font-weight: 800; color: var(--text-primary); }
@@ -533,7 +534,7 @@
         .module-tab-nav::-webkit-scrollbar { display: none; }
 
         .module-tab-btn {
-            padding: 10px 14px;
+            padding: 7px 12px;
             background: transparent;
             border: none;
             border-bottom: 2px solid transparent;
@@ -570,6 +571,7 @@
         /* ── TAB PANELS ── */
         .module-tab-panels {
             flex: 1;
+            min-height: 0;
             position: relative;
             overflow: hidden;
             border: 1px solid var(--border);
@@ -592,6 +594,7 @@
         /* ── CHART TAB: chart fills + timeframe bar at bottom ── */
         .tab-chart-wrapper {
             flex: 1;
+            min-height: 0;
             position: relative;
             overflow: hidden;
         }
@@ -671,12 +674,11 @@
 
         /* ── v4.1: MAIN CHART + ZOOM/PAN + NBBO ── */
         .main-chart-container {
-            flex: 1;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
             border: none;
             border-radius: 0;
             background-color: transparent;
-            position: relative;
-            min-height: 200px;
             overflow: hidden;
             cursor: crosshair;
         }
@@ -1299,6 +1301,24 @@
             return colors[Math.floor(Math.random() * colors.length)];
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // 🔧 v4.3: TICKER NORMALIZATION — Polygon WS returns inconsistent formats
+        // XT events: pair="BTCUSD" or "BTC-USD" instead of "X:BTCUSD"
+        // C events: p="EURUSD" instead of "C:EURUSD"
+        // ═══════════════════════════════════════════════════════════════
+        function normalizeCryptoTicker(raw) {
+            if (!raw) return raw;
+            if (raw.indexOf('X:') === 0) return raw;
+            if (raw.indexOf('-') !== -1) return 'X:' + raw.replace(/-/g, '');
+            return 'X:' + raw;
+        }
+
+        function normalizeForexTicker(raw) {
+            if (!raw) return raw;
+            if (raw.indexOf('C:') === 0) return raw;
+            return 'C:' + raw.replace(/-/g, '');
+        }
+
         // ═════════════════════════════════════════════════════════════════════════
         // DETECCIÓN DE HORARIO DE MERCADO (sin cambios)
         // ═════════════════════════════════════════════════════════════════════════
@@ -1418,8 +1438,17 @@
             console.log('[SNAPSHOT] Obteniendo precio real de ' + ticker + '...');
 
             fetch(url)
-                .then(function(response) { return response.json(); })
+                .then(function(response) {
+                    if (!response.ok) {
+                        console.error('[SNAPSHOT] ❌ HTTP ' + response.status + ' para ' + ticker + ' (' + type + ')');
+                        if (response.status === 403) console.error('[SNAPSHOT] ⚠️ Tu plan Polygon puede NO incluir snapshots para ' + type);
+                        if (response.status === 429) console.warn('[SNAPSHOT] ⚠️ Rate limit alcanzado');
+                        return null;
+                    }
+                    return response.json();
+                })
                 .then(function(data) {
+                    if (!data) return;
                     var snapshot = data.ticker || data;
                     if (!snapshot) {
                         console.warn('[SNAPSHOT] Sin datos para ' + ticker);
@@ -1525,6 +1554,47 @@
             }
         }
 
+        /**
+         * 🔧 v4.3: Precarga precios para TODOS los assets en dropdowns
+         * Evita que crypto/forex muestren "--" hasta que lleguen WS events
+         */
+        function fetchDropdownSnapshots() {
+            var delay = 0;
+            var marketKeys = Object.keys(MARKET_ASSETS);
+            for (var k = 0; k < marketKeys.length; k++) {
+                var market = MARKET_ASSETS[marketKeys[k]];
+                // Solo crypto siempre, forex/stocks si activos
+                if (market.type !== 'crypto' && !isMarketActive(market.type)) continue;
+                for (var a = 0; a < market.assets.length; a++) {
+                    (function(asset, type) {
+                        setTimeout(function() {
+                            var url = getSnapshotURL(asset.ticker, type);
+                            if (!url) return;
+                            fetch(url)
+                                .then(function(r) { return r.ok ? r.json() : null; })
+                                .then(function(data) {
+                                    if (!data) return;
+                                    var snap = data.ticker || data;
+                                    var price = 0;
+                                    if (type === 'forex') {
+                                        price = (snap.lastQuote && snap.lastQuote.a) || (snap.min && snap.min.c) || 0;
+                                    } else {
+                                        price = (snap.lastTrade && snap.lastTrade.p) || (snap.min && snap.min.c) || (snap.prevDay && snap.prevDay.c) || 0;
+                                    }
+                                    if (price > 0) {
+                                        asset.price = price;
+                                        asset.change = snap.todaysChangePerc || 0;
+                                        console.log('[DROPDOWN] ✅ ' + asset.ticker + ': $' + price.toFixed(2));
+                                    }
+                                }).catch(function() {});
+                        }, delay);
+                        delay += 200;
+                    })(market.assets[a], market.type);
+                }
+            }
+            console.log('[DROPDOWN] 🔄 Precargando ' + (delay / 200) + ' assets...');
+        }
+
         // ═════════════════════════════════════════════════════════════════════════
         // 🔄 v3.0: HISTORIAL REAL DE PRECIOS (reemplaza generatePriceHistory)
         // ═════════════════════════════════════════════════════════════════════════
@@ -1552,8 +1622,16 @@
             console.log('[HISTORY] Cargando historial real de ' + ticker + '...');
 
             fetch(url)
-                .then(function(response) { return response.json(); })
+                .then(function(response) {
+                    if (!response.ok) {
+                        console.error('[HISTORY] ❌ HTTP ' + response.status + ' para ' + ticker);
+                        if (response.status === 403) console.error('[HISTORY] ⚠️ Tu plan puede no incluir Aggs para ' + type);
+                        return null;
+                    }
+                    return response.json();
+                })
                 .then(function(data) {
+                    if (!data) return;
                     if (data.results && data.results.length > 0) {
                         var history = [];
                         for (var i = 0; i < data.results.length; i++) {
@@ -1617,8 +1695,15 @@
             console.log('[HISTORY-FALLBACK] Cargando historial extendido de ' + ticker + '...');
 
             fetch(url)
-                .then(function(response) { return response.json(); })
+                .then(function(response) {
+                    if (!response.ok) {
+                        console.error('[HISTORY-FALLBACK] ❌ HTTP ' + response.status + ' para ' + ticker);
+                        return null;
+                    }
+                    return response.json();
+                })
                 .then(function(data) {
+                    if (!data) return;
                     if (data.results && data.results.length > 0) {
                         var history = [];
                         // Tomar las últimas 100 barras como máximo
@@ -2018,14 +2103,16 @@
                     if (msg.ev === 'status') {
                         if (msg.status === 'auth_success') {
                             console.log('[WS] ✅ Autenticado: ' + type);
+                            console.log('[WS] 📡 Suscribiendo tickers de ' + type + '...');
                             navbarState.wsStatus[type] = 'connected';
                             reconnectAttempts[type] = 0;
                             updateDropdownWsStatus(type);
                             subscribeAllTickers(type);
                             guidebookState.useRealData = true;
-                            evaluatePollingNeed(); // 🔄 v3.0: Detener polling si WS conectó
+                            evaluatePollingNeed();
                         } else if (msg.status === 'auth_failed') {
-                            console.error('[WS] ❌ Auth falló: ' + type);
+                            console.error('[WS] ❌ Auth falló: ' + type + ' — ' + (msg.message || 'sin detalle'));
+                            console.error('[WS] ⚠️ Verifica API key y permisos WS');
                             navbarState.wsStatus[type] = 'disconnected';
                             updateDropdownWsStatus(type);
                             evaluatePollingNeed(); // 🔄 v3.0
@@ -2041,6 +2128,14 @@
                     }
                     if (msg.ev === 'XT' && type === 'crypto') {
                         handleCryptoTrade(msg);
+                        if (tradeCount.crypto <= 3) console.log('[WS] 🔍 Crypto trade raw:', JSON.stringify(msg).substring(0, 200));
+                    }
+                    if ((msg.ev === 'XA' || msg.ev === 'XAS') && type === 'crypto') {
+                        var xaTicker = normalizeCryptoTicker(msg.pair);
+                        if (xaTicker && msg.c && msg.o) {
+                            var xaChange = ((msg.c - msg.o) / msg.o) * 100;
+                            updateAssetChange(xaTicker, xaChange, 'crypto');
+                        }
                     }
                     if (msg.ev === 'Q' && type === 'stocks') {
                         handleStockNBBO(msg);
@@ -2119,6 +2214,7 @@
             } else if (type === 'crypto') {
                 var cryptoSubs = tickers.map(function(t) { return 'XT.' + t; }).join(',');
                 cryptoSubs += ',' + tickers.map(function(t) { return 'XQ.' + t; }).join(',');
+                cryptoSubs += ',' + tickers.map(function(t) { return 'XA.' + t; }).join(',');
                 ws.send(JSON.stringify({ action: 'subscribe', params: cryptoSubs }));
             } else if (type === 'forex') {
                 ws.send(JSON.stringify({ action: 'subscribe', params: tickers.map(function(t) { return 'C.' + t; }).join(',') }));
@@ -2139,6 +2235,7 @@
                 ws.send(JSON.stringify({ action: 'subscribe', params: 'Q.' + ticker }));
             } else if (type === 'crypto') {
                 ws.send(JSON.stringify({ action: 'subscribe', params: 'XQ.' + ticker }));
+                ws.send(JSON.stringify({ action: 'subscribe', params: 'XA.' + ticker }));
             }
 
             console.log('[WS] Suscrito a ticker:', ticker, '(+ NBBO)');
@@ -2159,13 +2256,15 @@
         }
 
         function handleCryptoTrade(msg) {
-            var ticker = msg.pair;
+            var ticker = normalizeCryptoTicker(msg.pair);
+            if (!ticker || !msg.p) return;
             updateAssetPrice(ticker, msg.p, 'crypto');
             updateReelIfMatches(ticker, msg.p);
         }
 
         function handleForexQuote(msg) {
-            var ticker = msg.p;
+            var ticker = normalizeForexTicker(msg.p);
+            if (!ticker || !msg.a) return;
             updateAssetPrice(ticker, msg.a, 'forex');
             updateReelIfMatches(ticker, msg.a);
         }
@@ -2188,7 +2287,7 @@
         }
 
         function handleCryptoNBBO(msg) {
-            var ticker = msg.pair;
+            var ticker = normalizeCryptoTicker(msg.pair);
             if (!ticker || !msg.bp || !msg.ap) return;
             realNBBO[ticker] = {
                 bp: msg.bp, bs: msg.bs || 0,
@@ -2202,7 +2301,7 @@
         }
 
         function handleForexNBBO(msg) {
-            var ticker = msg.p;
+            var ticker = normalizeForexTicker(msg.p);
             if (!ticker || !msg.b || !msg.a) return;
             realNBBO[ticker] = {
                 bp: msg.b, bs: 0,
@@ -2323,11 +2422,18 @@
                 reel.price = price;
 
                 var history = guidebookState.priceHistory[reelId];
-                if (history && history.length > 0) {
-                    reel.change = ((price - history[0].price) / history[0].price) * 100;
-                    reel.isPositive = reel.change >= 0;
-                    history.push({ time: Date.now(), price: price });
-                    if (history.length > 200) history.shift(); // 🔄 v3.0: 200 en vez de 100
+                if (history) {
+                    if (history.length > 0) {
+                        var firstPrice = history[0].open || history[0].price;
+                        reel.change = ((price - firstPrice) / firstPrice) * 100;
+                        reel.isPositive = reel.change >= 0;
+                    } else {
+                        // 🔧 v4.3: Bootstrap — WS arrived before REST history loaded
+                        reel.change = 0;
+                        reel.isPositive = true;
+                    }
+                    history.push({ time: Date.now(), price: price, open: price, high: price, low: price, volume: 0 });
+                    if (history.length > 200) history.shift();
                 }
 
                 updateReelData(reelId, reel);
@@ -3223,7 +3329,7 @@
         // ═════════════════════════════════════════════════════════════════════════
         document.addEventListener('DOMContentLoaded', function() {
             console.log('═══════════════════════════════════════════════════════');
-            console.log('📊 Guidebook Module v4.2 — TAB SYSTEM + CANDLESTICK + REAL NBBO BOOKMAP');
+            console.log('📊 Guidebook Module v4.3 — TICKER FIX + TAB SYSTEM + CANDLESTICK + REAL NBBO BOOKMAP');
             console.log('═══════════════════════════════════════════════════════');
 
             // 1. Detectar horario de mercado
@@ -3265,7 +3371,12 @@
                 // 7. Obtener precios actuales via Snapshot API (reemplaza fetchAllLastPrices)
                 setTimeout(function() {
                     fetchAllSnapshots();
-                }, 1500); // Esperar a que los historiales se carguen primero
+                }, 1500);
+
+                // 7b. 🔧 v4.3: Precargar precios de TODOS los assets en dropdown
+                setTimeout(function() {
+                    fetchDropdownSnapshots();
+                }, 3000);
 
                 // 8. Conectar WebSockets para datos en vivo
                 if (isMarketActive('stocks')) {
@@ -3300,23 +3411,17 @@
                 }, marketStatus.checkInterval);
 
                 console.log('═══════════════════════════════════════════════════════');
-                console.log('📊 Guidebook v4.2 — TAB NAV + FULL REAL-TIME + NBBO BOOKMAP ✅');
+                console.log('📊 Guidebook v4.3 — TICKER FIX + TAB NAV + FULL REAL-TIME + NBBO BOOKMAP ✅');
                 console.log('  ✅ Historial de precios: DATOS REALES (Polygon Aggs)');
                 console.log('  ✅ Precio actual: SNAPSHOT API (no /prev)');
                 console.log('  ✅ Tiempo real: WEBSOCKET (Polygon Pro)');
                 console.log('  ✅ Fallback: REST POLLING cada 5s (no Math.random)');
-                console.log('  ✅ After-hours: DATOS REALES via WS + Snapshot');
-                console.log('  ✅ Pre-market: DATOS REALES via WS + Snapshot');
-                console.log('  ❌ ELIMINADO: generatePriceHistory (Math.random)');
-                console.log('  ❌ ELIMINADO: startPriceSimulation (Math.random)');
-                console.log('  ❌ ELIMINADO: fetchLastPrice (/prev endpoint)');
-                console.log('  💬 Mini-chat flotante: ACTIVO (feature social)');
-                console.log('  🕯️ Candlestick charts: OHLC + Volume bars');
-                console.log('  📊 Order Book: v4.1 NBBO-ANCHORED (Polygon Q.*/XQ.*)');
-                console.log('  🔍 Zoom/Pan: scroll + drag en main chart');
-                console.log('  ⇄ Bidirectional swap: main ⇄ small reels');
-                console.log('  📐 Tab navigation: Chart | News | Orders | Analysis | Signals | Fundamentals | Settings');
-                console.log('  ⏱️ Timeframe bar: fixed bottom (1m/5m/15m/1H/1D/1W/1M)');
+                console.log('  🔧 v4.3 FIX: normalizeCryptoTicker() — X:BTCUSD / BTCUSD / BTC-USD');
+                console.log('  🔧 v4.3 FIX: normalizeForexTicker() — C:EURUSD / EURUSD');
+                console.log('  🔧 v4.3 FIX: updateReelIfMatches bootstraps empty history');
+                console.log('  🔧 v4.3 FIX: HTTP status checks on all fetch() calls');
+                console.log('  🔧 v4.3 FIX: fetchDropdownSnapshots() precarga dropdown');
+                console.log('  🔧 v4.3 FIX: XA crypto aggregate subscription');
                 console.log('═══════════════════════════════════════════════════════');
             }, 100);
         });
